@@ -95,7 +95,7 @@ elseif (APPLE)
     list(APPEND WTF_PUBLIC_HEADERS
         spi/darwin/ProcessMemoryFootprint.h
     )
-elseif (CMAKE_SYSTEM_NAME MATCHES "Linux")
+elseif (CMAKE_SYSTEM_NAME MATCHES "Linux" OR CMAKE_SYSTEM_NAME MATCHES "Android")
     list(APPEND WTF_SOURCES
         linux/CurrentProcessMemoryStatus.cpp
         linux/MemoryFootprintLinux.cpp
