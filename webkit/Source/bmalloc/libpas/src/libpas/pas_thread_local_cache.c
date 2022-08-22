@@ -201,10 +201,14 @@ static void dump_thread_diagnostics(pthread_t thread)
     else
         pas_log("[%d] thread %p does not have id\n", getpid(), thread);
 #endif
+#if PAS_OS(ANDROID)
+    pas_log("[%d] thread %p has unknown name\n", getpid(), (void*)thread);
+#else
     if (!pthread_getname_np(thread, thread_name, sizeof(thread_name)))
         pas_log("[%d] thread %p has name %s\n", getpid(), (void*)thread, thread_name);
     else
         pas_log("[%d] thread %p does not have name\n", getpid(), (void*)thread);
+#endif
 }
 
 pas_thread_local_cache* pas_thread_local_cache_create(void)
