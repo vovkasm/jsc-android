@@ -114,6 +114,8 @@
 #define HAVE_CPP20_INCOMPATIBLE_INTERNAL_HEADERS 1
 #elif PLATFORM(PLAYSTATION)
 #define HAVE_MISSING_STD_FILESYSTEM_PATH_CONSTRUCTOR 1
+#elif defined(__ANDROID__) // TODO: fix this define (may be analogous to mac)
+#define HAVE_MISSING_STD_FILESYSTEM_PATH_CONSTRUCTOR 1
 #endif
 
 /* FIXME: Remove after CMake build enabled on Darwin */
