@@ -126,6 +126,10 @@
 #define PAS_OS_LINUX 1
 #endif
 
+#ifdef __ANDROID__
+#define PAS_OS_ANDROID 1
+#endif
+
 #if defined(__FreeBSD__) || defined(__DragonFly__) || defined(__FreeBSD_kernel__)
 #define PAS_OS_FREEBSD 1
 #endif
