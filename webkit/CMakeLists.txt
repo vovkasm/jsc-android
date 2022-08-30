@@ -16,7 +16,7 @@ project(WebKit)
 # -----------------------------------------------------------------------------
 # Common configuration
 #------------------------------------------------------------------------------
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/Source/cmake")
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/Source/cmake")
 include(WebKitCommon)
 
 # -----------------------------------------------------------------------------
