@@ -11,5 +11,5 @@ target_include_directories(uc
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 )
 
-target_compile_definitions(uc PRIVATE U_COMMON_IMPLEMENTATION=1)
+target_compile_definitions(uc PRIVATE U_COMMON_IMPLEMENTATION=1 U_STATIC_IMPLEMENTATION=1)
 target_compile_features(uc PRIVATE cxx_std_17)
