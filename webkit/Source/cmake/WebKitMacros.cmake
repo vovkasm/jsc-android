@@ -122,11 +122,11 @@ endmacro()
 macro(WEBKIT_FRAMEWORK_DECLARE _target)
     # add_library() without any source files triggers CMake warning
     # Addition of dummy "source" file does not result in any changes in generated build.ninja file
-    add_library(${_target} ${${_target}_LIBRARY_TYPE} "${CMAKE_BINARY_DIR}/cmakeconfig.h")
+    add_library(${_target} ${${_target}_LIBRARY_TYPE} "${PROJECT_BINARY_DIR}/cmakeconfig.h")
 endmacro()
 
 macro(WEBKIT_EXECUTABLE_DECLARE _target)
-    add_executable(${_target} "${CMAKE_BINARY_DIR}/cmakeconfig.h")
+    add_executable(${_target} "${PROJECT_BINARY_DIR}/cmakeconfig.h")
 endmacro()
 
 # Private macro for setting the properties of a target.
@@ -365,7 +365,7 @@ macro(WEBKIT_WRAP_EXECUTABLE _target)
         set(_wrapped_target_name ${_target}Lib)
     endif ()
 
-    add_library(${_wrapped_target_name} SHARED "${CMAKE_BINARY_DIR}/cmakeconfig.h")
+    add_library(${_wrapped_target_name} SHARED "${PROJECT_BINARY_DIR}/cmakeconfig.h")
 
     _WEBKIT_EXECUTABLE_LINK_FRAMEWORK(${_target})
     _WEBKIT_TARGET(${_target} ${_wrapped_target_name})
@@ -388,7 +388,7 @@ macro(WEBKIT_WRAP_EXECUTABLE _target)
 endmacro()
 
 macro(WEBKIT_CREATE_FORWARDING_HEADER _target_directory _file)
-    get_filename_component(_source_path "${CMAKE_SOURCE_DIR}/Source/" ABSOLUTE)
+    get_filename_component(_source_path "${PROJECT_SOURCE_DIR}/Source/" ABSOLUTE)
     get_filename_component(_absolute "${_file}" ABSOLUTE)
     get_filename_component(_name "${_file}" NAME)
     set(_target_filename "${_target_directory}/${_name}")
