@@ -1533,4 +1533,4 @@ if (USE_VERSION_STAMPER)
         VERBATIM)
 endif ()
 
-add_subdirectory(shell)
+# add_subdirectory(shell)
