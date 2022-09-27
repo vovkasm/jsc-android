@@ -58,8 +58,8 @@ endif ()
 # https://bugs.webkit.org/show_bug.cgi?id=172862
 if (NOT ENABLE_STATIC_JSC AND NOT WIN32)
     set(JavaScriptCore_LIBRARY_TYPE SHARED)
-    set(bmalloc_LIBRARY_TYPE OBJECT)
-    set(WTF_LIBRARY_TYPE OBJECT)
+    # set(bmalloc_LIBRARY_TYPE OBJECT)
+    # set(WTF_LIBRARY_TYPE OBJECT)
 endif ()
 
 if (WIN32)
