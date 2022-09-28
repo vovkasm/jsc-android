@@ -59,9 +59,7 @@ static constexpr bool verbose = false;
 } // namespace CodeCacheInternal
 
 struct SourceCodeValue {
-    SourceCodeValue()
-    {
-    }
+    SourceCodeValue() = default;
 
     SourceCodeValue(VM& vm, JSCell* cell, int64_t age)
         : cell(vm, cell)
@@ -80,12 +78,7 @@ public:
     typedef MapType::AddResult AddResult;
 
     CodeCacheMap()
-        : m_size(0)
-        , m_sizeAtLastPrune(0)
-        , m_timeAtLastPrune(MonotonicTime::now())
-        , m_minCapacity(0)
-        , m_capacity(0)
-        , m_age(0)
+        : m_timeAtLastPrune(MonotonicTime::now())
     {
     }
 
@@ -208,12 +201,12 @@ private:
     }
 
     MapType m_map;
-    int64_t m_size;
-    int64_t m_sizeAtLastPrune;
+    int64_t m_size { 0 };
+    int64_t m_sizeAtLastPrune { 0 };
     MonotonicTime m_timeAtLastPrune;
-    int64_t m_minCapacity;
-    int64_t m_capacity;
-    int64_t m_age;
+    int64_t m_minCapacity { 0 };
+    int64_t m_capacity { 0 };
+    int64_t m_age { 0 };
 };
 
 // Caches top-level code such as <script>, window.eval(), new Function, and JSEvaluateScript().
@@ -228,7 +221,7 @@ public:
     void updateCache(const UnlinkedFunctionExecutable*, const SourceCode&, CodeSpecializationKind, const UnlinkedFunctionCodeBlock*);
 
     void clear() { m_sourceCode.clear(); }
-    JS_EXPORT_PRIVATE void write(VM&);
+    JS_EXPORT_PRIVATE void write();
 
 private:
     template <class UnlinkedCodeBlockType, class ExecutableType> 
@@ -261,7 +254,7 @@ UnlinkedEvalCodeBlock* generateUnlinkedCodeBlockForDirectEval(VM&, DirectEvalExe
 UnlinkedProgramCodeBlock* recursivelyGenerateUnlinkedCodeBlockForProgram(VM&, const SourceCode&, JSParserStrictMode, JSParserScriptMode, OptionSet<CodeGenerationMode>, ParserError&, EvalContextType);
 UnlinkedModuleProgramCodeBlock* recursivelyGenerateUnlinkedCodeBlockForModuleProgram(VM&, const SourceCode&, JSParserStrictMode, JSParserScriptMode, OptionSet<CodeGenerationMode>, ParserError&, EvalContextType);
 
-void writeCodeBlock(VM&, const SourceCodeKey&, const SourceCodeValue&);
+void writeCodeBlock(const SourceCodeKey&, const SourceCodeValue&);
 RefPtr<CachedBytecode> serializeBytecode(VM&, UnlinkedCodeBlock*, const SourceCode&, SourceCodeType, JSParserStrictMode, JSParserScriptMode, FileSystem::PlatformFileHandle fd, BytecodeCacheError&, OptionSet<CodeGenerationMode>);
 SourceCodeKey sourceCodeKeyForSerializedProgram(VM&, const SourceCode&);
 SourceCodeKey sourceCodeKeyForSerializedModule(VM&, const SourceCode&);

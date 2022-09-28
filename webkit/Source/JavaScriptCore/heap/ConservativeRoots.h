@@ -48,7 +48,7 @@ private:
     static constexpr size_t inlineCapacity = 2048;
     
     template<typename MarkHook>
-    void genericAddPointer(void*, HeapVersion markingVersion, HeapVersion newlyAllocatedVersion, TinyBloomFilter, MarkHook&);
+    void genericAddPointer(void*, HeapVersion markingVersion, HeapVersion newlyAllocatedVersion, TinyBloomFilter<uintptr_t>, MarkHook&);
 
     template<typename MarkHook>
     void genericAddSpan(void*, void* end, MarkHook&);
@@ -56,7 +56,7 @@ private:
     void grow();
 
     HeapCell** m_roots;
-    size_t m_size;
+    size_t m_size { 0 };
     size_t m_capacity;
     Heap& m_heap;
     HeapCell* m_inlineRoots[inlineCapacity];

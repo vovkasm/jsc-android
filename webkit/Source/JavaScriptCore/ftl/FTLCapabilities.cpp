@@ -184,7 +184,7 @@ inline CapabilityLevel canCompile(Node* node)
     case Construct:
     case DirectConstruct:
     case CallVarargs:
-    case CallEval:
+    case CallDirectEval:
     case TailCallVarargs:
     case TailCallVarargsInlinedCaller:
     case ConstructVarargs:
@@ -289,6 +289,7 @@ inline CapabilityLevel canCompile(Node* node)
     case BooleanToNumber:
     case HasIndexedProperty:
     case GetIndexedPropertyStorage:
+    case ResolveRope:
     case GetPropertyEnumerator:
     case EnumeratorNextUpdateIndexAndMode:
     case EnumeratorNextExtractMode:

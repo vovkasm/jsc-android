@@ -70,10 +70,10 @@ public:
 
     const Wasm::ModuleInformation& moduleInformation() const;
     SymbolTable* exportSymbolTable() const;
-    Wasm::SignatureIndex signatureIndexFromFunctionIndexSpace(unsigned functionIndexSpace) const;
+    Wasm::TypeIndex typeIndexFromFunctionIndexSpace(unsigned functionIndexSpace) const;
 
     Expected<void, Wasm::BindingFailure> generateWasmToJSStubs(VM&);
-    MacroAssemblerCodePtr<WasmEntryPtrTag> wasmToEmbedderStub(size_t importFunctionNum) { return m_wasmToJSExitStubs[importFunctionNum].code(); }
+    CodePtr<WasmEntryPtrTag> wasmToEmbedderStub(size_t importFunctionNum) { return m_wasmToJSExitStubs[importFunctionNum].code(); }
 
     void clearJSCallICs(VM&);
     void finalizeUnconditionally(VM&);

@@ -45,14 +45,14 @@ typedef JSC::JSValue (*InspectorEvaluateHandler)(JSC::JSGlobalObject*, const JSC
 
 class InspectorEnvironment {
 public:
-    virtual ~InspectorEnvironment() { }
+    virtual ~InspectorEnvironment() = default;
     virtual bool developerExtrasEnabled() const = 0;
     virtual bool canAccessInspectedScriptState(JSC::JSGlobalObject*) const = 0;
     virtual InspectorFunctionCallHandler functionCallHandler() const = 0;
     virtual InspectorEvaluateHandler evaluateHandler() const = 0;
     virtual void frontendInitialized() = 0;
     virtual WTF::Stopwatch& executionStopwatch() const = 0;
-    virtual JSC::Debugger& debugger() = 0;
+    virtual JSC::Debugger* debugger() = 0;
     virtual JSC::VM& vm() = 0;
 };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 Apple Inc. All rights reserved.
+ * Copyright (C) 2018-2022 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -42,7 +42,7 @@ class YarrCodeBlock;
 
 class YarrJITInfo {
 public:
-    virtual ~YarrJITInfo() { };
+    virtual ~YarrJITInfo() = default;
     virtual const char* variant() = 0;
     virtual unsigned opCount() = 0;
     virtual void dumpPatternString(PrintStream&) = 0;
@@ -53,7 +53,7 @@ class YarrDisassembler {
     WTF_MAKE_FAST_ALLOCATED;
 public:
     YarrDisassembler(YarrJITInfo*);
-    ~YarrDisassembler();
+    ~YarrDisassembler() = default;
 
     void setStartOfCode(MacroAssembler::Label label) { m_startOfCode = label; }
     void setForGenerate(unsigned opIndex, MacroAssembler::Label label)
@@ -106,6 +106,8 @@ private:
     MacroAssembler::Label m_endOfGenerate;
     MacroAssembler::Label m_endOfBacktrack;
     MacroAssembler::Label m_endOfCode;
+    void* m_codeStart { nullptr };
+    void* m_codeEnd { nullptr };
     unsigned m_indentLevel { 0 };
 };
 

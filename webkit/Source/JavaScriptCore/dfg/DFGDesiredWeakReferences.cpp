@@ -34,19 +34,14 @@
 
 namespace JSC { namespace DFG {
 
-DesiredWeakReferences::DesiredWeakReferences()
-    : m_codeBlock(nullptr)
-{
-}
+DesiredWeakReferences::DesiredWeakReferences() = default;
 
 DesiredWeakReferences::DesiredWeakReferences(CodeBlock* codeBlock)
     : m_codeBlock(codeBlock)
 {
 }
 
-DesiredWeakReferences::~DesiredWeakReferences()
-{
-}
+DesiredWeakReferences::~DesiredWeakReferences() = default;
 
 void DesiredWeakReferences::addLazily(JSCell* cell)
 {
@@ -73,14 +68,14 @@ void DesiredWeakReferences::reallyAdd(VM& vm, CommonData* common)
     Vector<StructureID> weakStructureReferences;
     Vector<WriteBarrier<JSCell>> weakReferences;
     for (JSCell* target : m_references) {
-        if (Structure* structure = jsDynamicCast<Structure*>(vm, target))
+        if (Structure* structure = jsDynamicCast<Structure*>(target))
             weakStructureReferences.append(structure->id());
         else {
             // There are weird relationships in how optimized CodeBlocks
             // point to other CodeBlocks. We don't want to have them be
             // part of the weak pointer set. For example, an optimized CodeBlock
             // having a weak pointer to itself will cause it to get collected.
-            RELEASE_ASSERT(!jsDynamicCast<CodeBlock*>(vm, target));
+            RELEASE_ASSERT(!jsDynamicCast<CodeBlock*>(target));
             weakReferences.append(WriteBarrier<JSCell>(vm, m_codeBlock, target));
         }
     }

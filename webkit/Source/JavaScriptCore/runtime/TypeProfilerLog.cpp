@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2021 Apple Inc. All rights reserved.
+ * Copyright (C) 2014-2022 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,6 +29,7 @@
 #include "config.h"
 #include "TypeProfilerLog.h"
 
+#include "FrameTracers.h"
 #include "JSCJSValueInlines.h"
 #include "TypeLocation.h"
 
@@ -40,7 +41,6 @@ static constexpr bool verbose = false;
 
 TypeProfilerLog::TypeProfilerLog(VM& vm)
     : m_vm(vm)
-    , m_logSize(50000)
     , m_logStartPtr(new LogEntry[m_logSize])
     , m_currentLogEntryPtr(m_logStartPtr)
     , m_logEndPtr(m_logStartPtr + m_logSize)
@@ -58,9 +58,9 @@ void TypeProfilerLog::processLogEntries(VM& vm, const String& reason)
     // We need to do this because this code will call into calculatedDisplayName.
     // calculatedDisplayName will clear any exception it sees (because it thinks
     // it's a stack overflow). We may be called when an exception was already
-    // thrown, so we don't want calcualtedDisplayName to clear that exception that
+    // thrown, so we don't want calculatedDisplayName to clear that exception that
     // was thrown before we even got here.
-    VM::DeferExceptionScope deferExceptionScope(vm);
+    SuspendExceptionScope suspendExceptionScope(vm);
 
     MonotonicTime before { };
     if (TypeProfilerLogInternal::verbose) {
@@ -101,7 +101,7 @@ void TypeProfilerLog::processLogEntries(VM& vm, const String& reason)
                 shape = iter->value;
         }
 
-        RuntimeType type = runtimeTypeForValue(m_vm, value);
+        RuntimeType type = runtimeTypeForValue(value);
         TypeLocation* location = entry->location;
         location->m_lastSeenType = type;
         if (location->m_globalTypeSet)

@@ -53,12 +53,12 @@ public:
         return vm.remoteFunctionSpace<mode>();
     }
 
-    JS_EXPORT_PRIVATE static JSRemoteFunction* create(VM&, JSGlobalObject*, JSObject* targetCallable);
+    JS_EXPORT_PRIVATE static JSRemoteFunction* tryCreate(JSGlobalObject*, VM&, JSObject* targetCallable);
 
     JSObject* targetFunction() { return m_targetFunction.get(); }
     JSGlobalObject* targetGlobalObject() { return targetFunction()->globalObject(); }
     JSString* nameMayBeNull() const { return m_nameMayBeNull.get(); }
-    const String& nameString()
+    String nameString()
     {
         if (!m_nameMayBeNull)
             return emptyString();
@@ -82,12 +82,14 @@ public:
 private:
     JSRemoteFunction(VM&, NativeExecutable*, JSGlobalObject*, Structure*, JSObject* targetCallable);
 
-    void finishCreation(VM&);
+    void copyNameAndLength(JSGlobalObject*);
+
+    void finishCreation(JSGlobalObject*, VM&);
     DECLARE_VISIT_CHILDREN;
 
     WriteBarrier<JSObject> m_targetFunction;
     WriteBarrier<JSString> m_nameMayBeNull;
-    double m_length;
+    double m_length { 0.0 };
 };
 
 }

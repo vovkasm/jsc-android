@@ -59,6 +59,7 @@ public:
     constexpr size_t nextPossiblyUnset(size_t) const;
     constexpr void clear(size_t);
     void clearAll();
+    void setAll();
     constexpr void invert();
     int64_t findRunOfZeros(size_t runLength) const;
     size_t count(size_t start = 0) const;
@@ -83,12 +84,8 @@ public:
     class iterator {
         WTF_MAKE_FAST_ALLOCATED;
     public:
-        iterator()
-            : m_bitmap(nullptr)
-            , m_index(0)
-        {
-        }
-        
+        iterator() = default;
+
         iterator(const Bitmap& bitmap, size_t index)
             : m_bitmap(&bitmap)
             , m_index(index)
@@ -114,8 +111,8 @@ public:
         }
 
     private:
-        const Bitmap* m_bitmap;
-        size_t m_index;
+        const Bitmap* m_bitmap { nullptr };
+        size_t m_index { 0 };
     };
     
     // Use this to iterate over set bits.
@@ -141,7 +138,11 @@ public:
     WordType* storage() { return bits.data(); }
     const WordType* storage() const { return bits.data(); }
 
+    constexpr size_t storageLengthInBytes() { return sizeof(bits); }
+
 private:
+    void cleanseLastWord();
+
     static constexpr unsigned wordSize = sizeof(WordType) * 8;
     static constexpr unsigned words = (bitmapSize + wordSize - 1) / wordSize;
 
@@ -241,15 +242,28 @@ inline void Bitmap<bitmapSize, WordType>::clearAll()
 }
 
 template<size_t bitmapSize, typename WordType>
-inline constexpr void Bitmap<bitmapSize, WordType>::invert()
+inline void Bitmap<bitmapSize, WordType>::cleanseLastWord()
 {
-    for (size_t i = 0; i < words; ++i)
-        bits[i] = ~bits[i];
     if constexpr (!!(bitmapSize % wordSize)) {
         constexpr size_t remainingBits = bitmapSize % wordSize;
         constexpr WordType mask = (static_cast<WordType>(1) << remainingBits) - 1;
         bits[words - 1] &= mask;
     }
+}
+
+template<size_t bitmapSize, typename WordType>
+inline void Bitmap<bitmapSize, WordType>::setAll()
+{
+    memset(bits.data(), 0xFF, sizeof(bits));
+    cleanseLastWord();
+}
+
+template<size_t bitmapSize, typename WordType>
+inline constexpr void Bitmap<bitmapSize, WordType>::invert()
+{
+    for (size_t i = 0; i < words; ++i)
+        bits[i] = ~bits[i];
+    cleanseLastWord();
 }
 
 template<size_t bitmapSize, typename WordType>
@@ -462,11 +476,7 @@ inline void Bitmap<bitmapSize, WordType>::setEachNthBit(size_t n, size_t start, 
         index += n;
     }
 
-    if constexpr (!!(bitmapSize % wordSize)) {
-        constexpr size_t remainingBits = bitmapSize % wordSize;
-        constexpr WordType mask = (static_cast<WordType>(1) << remainingBits) - 1;
-        bits[words - 1] &= mask;
-    }
+    cleanseLastWord();
 }
 
 template<size_t bitmapSize, typename WordType>

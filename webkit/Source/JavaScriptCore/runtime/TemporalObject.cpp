@@ -35,8 +35,13 @@
 #include "TemporalInstantConstructor.h"
 #include "TemporalInstantPrototype.h"
 #include "TemporalNow.h"
+#include "TemporalPlainDate.h"
 #include "TemporalPlainDateConstructor.h"
 #include "TemporalPlainDatePrototype.h"
+#include "TemporalPlainDateTime.h"
+#include "TemporalPlainDateTimeConstructor.h"
+#include "TemporalPlainDateTimePrototype.h"
+#include "TemporalPlainTime.h"
 #include "TemporalPlainTimeConstructor.h"
 #include "TemporalPlainTimePrototype.h"
 #include "TemporalTimeZoneConstructor.h"
@@ -52,49 +57,56 @@ STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(TemporalObject);
 static JSValue createCalendarConstructor(VM& vm, JSObject* object)
 {
     TemporalObject* temporalObject = jsCast<TemporalObject*>(object);
-    JSGlobalObject* globalObject = temporalObject->globalObject(vm);
+    JSGlobalObject* globalObject = temporalObject->globalObject();
     return TemporalCalendarConstructor::create(vm, TemporalCalendarConstructor::createStructure(vm, globalObject, globalObject->functionPrototype()), jsCast<TemporalCalendarPrototype*>(globalObject->calendarStructure()->storedPrototypeObject()));
 }
 
 static JSValue createNowObject(VM& vm, JSObject* object)
 {
     TemporalObject* temporalObject = jsCast<TemporalObject*>(object);
-    JSGlobalObject* globalObject = temporalObject->globalObject(vm);
+    JSGlobalObject* globalObject = temporalObject->globalObject();
     return TemporalNow::create(vm, TemporalNow::createStructure(vm, globalObject));
 }
 
 static JSValue createDurationConstructor(VM& vm, JSObject* object)
 {
     TemporalObject* temporalObject = jsCast<TemporalObject*>(object);
-    JSGlobalObject* globalObject = temporalObject->globalObject(vm);
+    JSGlobalObject* globalObject = temporalObject->globalObject();
     return TemporalDurationConstructor::create(vm, TemporalDurationConstructor::createStructure(vm, globalObject, globalObject->functionPrototype()), jsCast<TemporalDurationPrototype*>(globalObject->durationStructure()->storedPrototypeObject()));
 }
 
 static JSValue createInstantConstructor(VM& vm, JSObject* object)
 {
     TemporalObject* temporalObject = jsCast<TemporalObject*>(object);
-    JSGlobalObject* globalObject = temporalObject->globalObject(vm);
+    JSGlobalObject* globalObject = temporalObject->globalObject();
     return TemporalInstantConstructor::create(vm, TemporalInstantConstructor::createStructure(vm, globalObject, globalObject->functionPrototype()), jsCast<TemporalInstantPrototype*>(globalObject->instantStructure()->storedPrototypeObject()));
 }
 
 static JSValue createPlainDateConstructor(VM& vm, JSObject* object)
 {
     TemporalObject* temporalObject = jsCast<TemporalObject*>(object);
-    auto* globalObject = temporalObject->globalObject(vm);
+    auto* globalObject = temporalObject->globalObject();
     return TemporalPlainDateConstructor::create(vm, TemporalPlainDateConstructor::createStructure(vm, globalObject, globalObject->functionPrototype()), jsCast<TemporalPlainDatePrototype*>(globalObject->plainDateStructure()->storedPrototypeObject()));
+}
+
+static JSValue createPlainDateTimeConstructor(VM& vm, JSObject* object)
+{
+    TemporalObject* temporalObject = jsCast<TemporalObject*>(object);
+    auto* globalObject = temporalObject->globalObject();
+    return TemporalPlainDateTimeConstructor::create(vm, TemporalPlainDateTimeConstructor::createStructure(vm, globalObject, globalObject->functionPrototype()), jsCast<TemporalPlainDateTimePrototype*>(globalObject->plainDateTimeStructure()->storedPrototypeObject()));
 }
 
 static JSValue createPlainTimeConstructor(VM& vm, JSObject* object)
 {
     TemporalObject* temporalObject = jsCast<TemporalObject*>(object);
-    auto* globalObject = temporalObject->globalObject(vm);
+    auto* globalObject = temporalObject->globalObject();
     return TemporalPlainTimeConstructor::create(vm, TemporalPlainTimeConstructor::createStructure(vm, globalObject, globalObject->functionPrototype()), jsCast<TemporalPlainTimePrototype*>(globalObject->plainTimeStructure()->storedPrototypeObject()));
 }
 
 static JSValue createTimeZoneConstructor(VM& vm, JSObject* object)
 {
     TemporalObject* temporalObject = jsCast<TemporalObject*>(object);
-    JSGlobalObject* globalObject = temporalObject->globalObject(vm);
+    JSGlobalObject* globalObject = temporalObject->globalObject();
     return TemporalTimeZoneConstructor::create(vm, TemporalTimeZoneConstructor::createStructure(vm, globalObject, globalObject->functionPrototype()), jsCast<TemporalTimeZonePrototype*>(globalObject->timeZoneStructure()->storedPrototypeObject()));
 }
 
@@ -111,12 +123,13 @@ namespace JSC {
   Instant        createInstantConstructor        DontEnum|PropertyCallback
   Now            createNowObject                 DontEnum|PropertyCallback
   PlainDate      createPlainDateConstructor      DontEnum|PropertyCallback
+  PlainDateTime  createPlainDateTimeConstructor  DontEnum|PropertyCallback
   PlainTime      createPlainTimeConstructor      DontEnum|PropertyCallback
   TimeZone       createTimeZoneConstructor       DontEnum|PropertyCallback
 @end
 */
 
-const ClassInfo TemporalObject::s_info = { "Temporal", &Base::s_info, &temporalObjectTable, nullptr, CREATE_METHOD_TABLE(TemporalObject) };
+const ClassInfo TemporalObject::s_info = { "Temporal"_s, &Base::s_info, &temporalObjectTable, nullptr, CREATE_METHOD_TABLE(TemporalObject) };
 
 TemporalObject::TemporalObject(VM& vm, Structure* structure)
     : Base(vm, structure)
@@ -138,25 +151,32 @@ Structure* TemporalObject::createStructure(VM& vm, JSGlobalObject* globalObject)
 void TemporalObject::finishCreation(VM& vm)
 {
     Base::finishCreation(vm);
-    ASSERT(inherits(vm, info()));
+    ASSERT(inherits(info()));
     JSC_TO_STRING_TAG_WITHOUT_TRANSITION();
 }
 
 static StringView singularUnit(StringView unit)
 {
     // Plurals are allowed, but thankfully they're all just a simple -s.
-    return unit.endsWith("s") ? unit.left(unit.length() - 1) : unit;
+    return unit.endsWith('s') ? unit.left(unit.length() - 1) : unit;
+}
+
+double nonNegativeModulo(double x, double y)
+{
+    double result = std::fmod(x, y);
+    if (!result)
+        return 0;
+    if (result < 0)
+        result += y;
+    return result;
 }
 
 // For use in error messages where a string value is potentially unbounded
 WTF::String ellipsizeAt(unsigned maxLength, const WTF::String& string)
 {
-    WTF::String copy { string };
-    if (string.length() > maxLength) {
-        copy.truncate(maxLength - 1);
-        copy.append(horizontalEllipsis);
-    }
-    return copy;
+    if (string.length() <= maxLength)
+        return string;
+    return makeString(StringView(string).left(maxLength - 1), horizontalEllipsis);
 }
 
 PropertyName temporalUnitPluralPropertyName(VM& vm, TemporalUnit unit)
@@ -199,25 +219,25 @@ std::optional<TemporalUnit> temporalUnitType(StringView unit)
 {
     StringView singular = singularUnit(unit);
 
-    if (singular == "year")
+    if (singular == "year"_s)
         return TemporalUnit::Year;
-    if (singular == "month")
+    if (singular == "month"_s)
         return TemporalUnit::Month;
-    if (singular == "week")
+    if (singular == "week"_s)
         return TemporalUnit::Week;
-    if (singular == "day")
+    if (singular == "day"_s)
         return TemporalUnit::Day;
-    if (singular == "hour")
+    if (singular == "hour"_s)
         return TemporalUnit::Hour;
-    if (singular == "minute")
+    if (singular == "minute"_s)
         return TemporalUnit::Minute;
-    if (singular == "second")
+    if (singular == "second"_s)
         return TemporalUnit::Second;
-    if (singular == "millisecond")
+    if (singular == "millisecond"_s)
         return TemporalUnit::Millisecond;
-    if (singular == "microsecond")
+    if (singular == "microsecond"_s)
         return TemporalUnit::Microsecond;
-    if (singular == "nanosecond")
+    if (singular == "nanosecond"_s)
         return TemporalUnit::Nanosecond;
     
     return std::nullopt;
@@ -230,7 +250,7 @@ std::optional<TemporalUnit> temporalLargestUnit(JSGlobalObject* globalObject, JS
     VM& vm = globalObject->vm();
     auto scope = DECLARE_THROW_SCOPE(vm);
 
-    String largestUnit = intlStringOption(globalObject, options, vm.propertyNames->largestUnit, { }, nullptr, nullptr);
+    String largestUnit = intlStringOption(globalObject, options, vm.propertyNames->largestUnit, { }, { }, { });
     RETURN_IF_EXCEPTION(scope, std::nullopt);
 
     if (!largestUnit)
@@ -260,7 +280,7 @@ std::optional<TemporalUnit> temporalSmallestUnit(JSGlobalObject* globalObject, J
     VM& vm = globalObject->vm();
     auto scope = DECLARE_THROW_SCOPE(vm);
 
-    String smallestUnit = intlStringOption(globalObject, options, vm.propertyNames->smallestUnit, { }, nullptr, nullptr);
+    String smallestUnit = intlStringOption(globalObject, options, vm.propertyNames->smallestUnit, { }, { }, { });
     RETURN_IF_EXCEPTION(scope, std::nullopt);
 
     if (!smallestUnit)
@@ -309,7 +329,7 @@ std::optional<unsigned> temporalFractionalSecondDigits(JSGlobalObject* globalObj
     String stringValue = value.toWTFString(globalObject);
     RETURN_IF_EXCEPTION(scope, std::nullopt);
 
-    if (stringValue != "auto")
+    if (stringValue != "auto"_s)
         throwRangeError(globalObject, scope, makeString("fractionalSecondDigits must be 'auto' or 0 through 9, not "_s, ellipsizeAt(100, stringValue)));
 
     return std::nullopt;
@@ -475,12 +495,8 @@ double roundNumberToIncrement(double x, double increment, RoundingMode mode)
     RELEASE_ASSERT_NOT_REACHED();
 }
 
-static Int128 abs(Int128 x)
-{
-    return x < 0 ? -x : x;
-}
-
-// Same as above, but with Int128
+// RoundNumberToIncrementAsIfPositive ( x, increment, roundingMode )
+// https://tc39.es/proposal-temporal/#sec-temporal-roundnumbertoincrementasifpositive
 Int128 roundNumberToIncrement(Int128 x, Int128 increment, RoundingMode mode)
 {
     ASSERT(increment);
@@ -500,15 +516,16 @@ Int128 roundNumberToIncrement(Int128 x, Int128 increment, RoundingMode mode)
             quotient++;
         break;
     case RoundingMode::Floor:
+    case RoundingMode::Trunc:
         if (sign)
             quotient--;
         break;
-    case RoundingMode::Trunc:
-        break;
     case RoundingMode::HalfExpand:
-        // "half up away from zero"
-        if (abs(remainder * 2) >= increment)
-            quotient += sign ? -1 : 1;
+        // "half up toward infinity"
+        if (!sign && remainder * 2 >= increment)
+            quotient++;
+        else if (sign && -remainder * 2 > increment)
+            quotient--;
         break;
     // They are not supported in Temporal right now.
     case RoundingMode::Expand:
@@ -526,6 +543,35 @@ TemporalOverflow toTemporalOverflow(JSGlobalObject* globalObject, JSObject* opti
     return intlOption<TemporalOverflow>(globalObject, options, globalObject->vm().propertyNames->overflow,
         { { "constrain"_s, TemporalOverflow::Constrain }, { "reject"_s, TemporalOverflow::Reject } },
         "overflow must be either \"constrain\" or \"reject\""_s, TemporalOverflow::Constrain);
+}
+
+// https://tc39.es/proposal-temporal/#sec-temporal-rejectobjectwithcalendarortimezone
+void rejectObjectWithCalendarOrTimeZone(JSGlobalObject* globalObject, JSObject* object)
+{
+    VM& vm = globalObject->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
+    // FIXME: Also support PlainMonthDay, PlainYearMonth, ZonedDateTime.
+    if (object->inherits<TemporalPlainDate>()
+        || object->inherits<TemporalPlainDateTime>()
+        || object->inherits<TemporalPlainTime>()) {
+        throwTypeError(globalObject, scope, "argument object must not have calendar or timeZone property"_s);
+        return;
+    }
+
+    auto calendar = object->get(globalObject, vm.propertyNames->calendar);    
+    RETURN_IF_EXCEPTION(scope, void());
+    if (!calendar.isUndefined()) {
+        throwTypeError(globalObject, scope, "argument object must not have calendar property"_s);
+        return;
+    }
+
+    auto timeZone = object->get(globalObject, vm.propertyNames->timeZone);    
+    RETURN_IF_EXCEPTION(scope, void());
+    if (!timeZone.isUndefined()) {
+        throwTypeError(globalObject, scope, "argument object must not have timeZone property"_s);
+        return;
+    }
 }
 
 } // namespace JSC

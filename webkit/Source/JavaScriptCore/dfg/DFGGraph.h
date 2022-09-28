@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2021 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2022 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -123,7 +123,7 @@ enum AddSpeculationMode {
 struct Prefix {
     enum NoHeaderTag { NoHeader };
 
-    Prefix() { }
+    Prefix() = default;
 
     Prefix(const char* prefixStr, NoHeaderTag tag = NoHeader)
         : prefixStr(prefixStr)
@@ -473,20 +473,7 @@ public:
     JSObject* globalThisObjectFor(CodeOrigin codeOrigin)
     {
         JSGlobalObject* object = globalObjectFor(codeOrigin);
-        return jsCast<JSObject*>(object->methodTable(m_vm)->toThis(object, object, ECMAMode::sloppy()));
-    }
-    
-    ScriptExecutable* executableFor(InlineCallFrame* inlineCallFrame)
-    {
-        if (!inlineCallFrame)
-            return m_codeBlock->ownerExecutable();
-        
-        return inlineCallFrame->baselineCodeBlock->ownerExecutable();
-    }
-    
-    ScriptExecutable* executableFor(const CodeOrigin& codeOrigin)
-    {
-        return executableFor(codeOrigin.inlineCallFrame());
+        return jsCast<JSObject*>(object->methodTable()->toThis(object, object, ECMAMode::sloppy()));
     }
     
     CodeBlock* baselineCodeBlockFor(InlineCallFrame* inlineCallFrame)
@@ -503,6 +490,8 @@ public:
     
     bool masqueradesAsUndefinedWatchpointIsStillValid(const CodeOrigin& codeOrigin)
     {
+        if (m_plan.isUnlinked())
+            return false;
         return globalObjectFor(codeOrigin)->masqueradesAsUndefinedWatchpoint()->isStillValid();
     }
     
@@ -681,11 +670,8 @@ public:
     
     class NaturalBlockIterable {
     public:
-        NaturalBlockIterable()
-            : m_graph(nullptr)
-        {
-        }
-        
+        NaturalBlockIterable() = default;
+
         NaturalBlockIterable(const Graph& graph)
             : m_graph(&graph)
         {
@@ -693,12 +679,8 @@ public:
         
         class iterator {
         public:
-            iterator()
-                : m_graph(nullptr)
-                , m_index(0)
-            {
-            }
-            
+            iterator() = default;
+
             iterator(const Graph& graph, BlockIndex index)
                 : m_graph(&graph)
                 , m_index(findNext(index))
@@ -734,8 +716,8 @@ public:
                 return index;
             }
             
-            const Graph* m_graph;
-            BlockIndex m_index;
+            const Graph* m_graph { nullptr };
+            BlockIndex m_index { 0 };
         };
         
         iterator begin()
@@ -749,7 +731,7 @@ public:
         }
         
     private:
-        const Graph* m_graph;
+        const Graph* m_graph { nullptr };
     };
     
     NaturalBlockIterable blocksInNaturalOrder() const
@@ -795,12 +777,17 @@ public:
 
     bool isWatchingHavingABadTimeWatchpoint(Node* node)
     {
+        if (m_plan.isUnlinked())
+            return false;
         JSGlobalObject* globalObject = globalObjectFor(node->origin.semantic);
         return watchpoints().isWatched(globalObject->havingABadTimeWatchpoint());
     }
 
     bool isWatchingGlobalObjectWatchpoint(JSGlobalObject* globalObject, InlineWatchpointSet& set)
     {
+        if (m_plan.isUnlinked())
+            return false;
+
         if (watchpoints().isWatched(set))
             return true;
 
@@ -819,6 +806,9 @@ public:
 
     bool isWatchingArrayIteratorProtocolWatchpoint(Node* node)
     {
+        if (m_plan.isUnlinked())
+            return false;
+
         JSGlobalObject* globalObject = globalObjectFor(node->origin.semantic);
         InlineWatchpointSet& set = globalObject->arrayIteratorProtocolWatchpointSet();
         return isWatchingGlobalObjectWatchpoint(globalObject, set);
@@ -826,8 +816,40 @@ public:
 
     bool isWatchingNumberToStringWatchpoint(Node* node)
     {
+        if (m_plan.isUnlinked())
+            return false;
+
         JSGlobalObject* globalObject = globalObjectFor(node->origin.semantic);
         InlineWatchpointSet& set = globalObject->numberToStringWatchpointSet();
+        return isWatchingGlobalObjectWatchpoint(globalObject, set);
+    }
+
+    bool isWatchingStructureCacheClearedWatchpoint(JSGlobalObject* globalObject)
+    {
+        if (m_plan.isUnlinked())
+            return false;
+
+        InlineWatchpointSet& set = globalObject->structureCacheClearedWatchpoint();
+        return isWatchingGlobalObjectWatchpoint(globalObject, set);
+    }
+
+    bool isWatchingStringSymbolReplaceWatchpoint(Node* node)
+    {
+        if (m_plan.isUnlinked())
+            return false;
+
+        JSGlobalObject* globalObject = globalObjectFor(node->origin.semantic);
+        InlineWatchpointSet& set = globalObject->stringSymbolReplaceWatchpointSet();
+        return isWatchingGlobalObjectWatchpoint(globalObject, set);
+    }
+
+    bool isWatchingRegExpPrimordialPropertiesWatchpoint(Node* node)
+    {
+        if (m_plan.isUnlinked())
+            return false;
+
+        JSGlobalObject* globalObject = globalObjectFor(node->origin.semantic);
+        InlineWatchpointSet& set = globalObject->regExpPrimordialPropertiesWatchpointSet();
         return isWatchingGlobalObjectWatchpoint(globalObject, set);
     }
 
@@ -1035,8 +1057,7 @@ public:
     }
     bool willCatchExceptionInMachineFrame(CodeOrigin, CodeOrigin& opCatchOriginOut, HandlerInfo*& catchHandlerOut);
     
-    bool needsScopeRegister() const { return m_hasDebuggerEnabled || m_codeBlock->usesCallEval(); }
-    bool needsFlushedThis() const { return m_codeBlock->usesCallEval(); }
+    bool needsScopeRegister() const { return m_hasDebuggerEnabled; }
 
     void clearCPSCFGData();
 
@@ -1069,18 +1090,30 @@ public:
     const UnlinkedStringJumpTable& unlinkedStringSwitchJumpTable(unsigned index) const { return *m_unlinkedStringSwitchJumpTables[index]; }
     StringJumpTable& stringSwitchJumpTable(unsigned index) { return m_stringSwitchJumpTables[index]; }
 
-    void appendCatchEntrypoint(BytecodeIndex bytecodeIndex, MacroAssemblerCodePtr<ExceptionHandlerPtrTag> machineCode, Vector<FlushFormat>&& argumentFormats)
+    void appendCatchEntrypoint(BytecodeIndex bytecodeIndex, CodePtr<ExceptionHandlerPtrTag> machineCode, Vector<FlushFormat>&& argumentFormats)
     {
         m_catchEntrypoints.append(CatchEntrypointData { machineCode, FixedVector<FlushFormat>(WTFMove(argumentFormats)), bytecodeIndex });
     }
 
     void freeDFGIRAfterLowering();
 
+    const BoyerMooreHorspoolTable<uint8_t>* tryAddStringSearchTable8(const String& string)
+    {
+        constexpr unsigned minPatternLength = 9;
+        if (string.length() > BoyerMooreHorspoolTable<uint8_t>::maxPatternLength)
+            return nullptr;
+        if (string.length() < minPatternLength)
+            return nullptr;
+        return m_stringSearchTable8.ensure(string, [&]() {
+            return makeUnique<BoyerMooreHorspoolTable<uint8_t>>(string);
+        }).iterator->value.get();
+    }
+
     StackCheck m_stackChecker;
     VM& m_vm;
     Plan& m_plan;
-    CodeBlock* m_codeBlock;
-    CodeBlock* m_profiledBlock;
+    CodeBlock* const m_codeBlock;
+    CodeBlock* const m_profiledBlock;
 
     Vector<RefPtr<BasicBlock>, 8> m_blocks;
     Vector<BasicBlock*, 1> m_roots;
@@ -1091,6 +1124,7 @@ public:
     Vector<SimpleJumpTable> m_switchJumpTables;
     Vector<const UnlinkedStringJumpTable*> m_unlinkedStringSwitchJumpTables;
     Vector<StringJumpTable> m_stringSwitchJumpTables;
+    HashMap<String, std::unique_ptr<BoyerMooreHorspoolTable<uint8_t>>> m_stringSearchTable8;
 
     HashMap<EncodedJSValue, FrozenValue*, EncodedJSValueHash, EncodedJSValueHashTraits> m_frozenValueMap;
     Bag<FrozenValue> m_frozenValues;
@@ -1161,7 +1195,7 @@ public:
     std::unique_ptr<ControlEquivalenceAnalysis> m_controlEquivalenceAnalysis;
     unsigned m_tmps;
     unsigned m_localVars;
-    unsigned m_nextMachineLocal;
+    unsigned m_nextMachineLocal { 0 };
     unsigned m_parameterSlots;
 
     // This is the number of logical entrypoints that we're compiling. This is only used
@@ -1182,13 +1216,13 @@ public:
     HashMap<GenericHashKey<int64_t>, double*> m_doubleConstantsMap;
     Bag<double> m_doubleConstants;
 #endif
-    
-    OptimizationFixpointState m_fixpointState;
-    StructureRegistrationState m_structureRegistrationState;
-    GraphForm m_form;
-    UnificationState m_unificationState;
+
+    OptimizationFixpointState m_fixpointState { BeforeFixpoint };
+    StructureRegistrationState m_structureRegistrationState { HaveNotStartedRegistering };
+    GraphForm m_form { LoadStore };
+    UnificationState m_unificationState { LocallyUnified };
     PlanStage m_planStage { PlanStage::Initial };
-    RefCountState m_refCountState;
+    RefCountState m_refCountState { EverythingIsLive };
     bool m_hasDebuggerEnabled;
     bool m_hasExceptionHandlers { false };
     bool m_isInSSAConversion { false };

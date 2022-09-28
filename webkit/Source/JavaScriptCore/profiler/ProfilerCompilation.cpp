@@ -36,15 +36,11 @@ namespace JSC { namespace Profiler {
 Compilation::Compilation(Bytecodes* bytecodes, CompilationKind kind)
     : m_kind(kind)
     , m_bytecodes(bytecodes)
-    , m_numInlinedGetByIds(0)
-    , m_numInlinedPutByIds(0)
-    , m_numInlinedCalls(0)
-    , m_jettisonReason(NotJettisoned)
     , m_uid(UID::create())
 {
 }
 
-Compilation::~Compilation() { }
+Compilation::~Compilation() = default;
 
 void Compilation::addProfiledBytecodes(Database& database, CodeBlock* profiledBlock)
 {
@@ -82,7 +78,7 @@ ExecutionCounter* Compilation::executionCounterFor(const OriginStack& origin)
     return counter.get();
 }
 
-void Compilation::addOSRExitSite(const Vector<MacroAssemblerCodePtr<JSInternalPtrTag>>& codeAddresses)
+void Compilation::addOSRExitSite(const Vector<CodePtr<JSInternalPtrTag>>& codeAddresses)
 {
     m_osrExitSites.append(OSRExitSite(codeAddresses));
 }

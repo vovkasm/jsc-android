@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2021 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2022 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -59,11 +59,8 @@ private:
 
 class PolymorphicCallCase {
 public:
-    PolymorphicCallCase()
-        : m_codeBlock(nullptr)
-    {
-    }
-    
+    PolymorphicCallCase() = default;
+
     PolymorphicCallCase(CallVariant variant, CodeBlock* codeBlock)
         : m_variant(variant)
         , m_codeBlock(codeBlock)
@@ -77,17 +74,17 @@ public:
     
 private:
     CallVariant m_variant;
-    CodeBlock* m_codeBlock;
+    CodeBlock* const m_codeBlock { nullptr };
 };
 
 class PolymorphicCallStubRoutine final : public GCAwareJITStubRoutine {
 public:
+    friend class JITStubRoutine;
+
     PolymorphicCallStubRoutine(
         const MacroAssemblerCodeRef<JITStubRoutinePtrTag>&, VM&, const JSCell* owner,
         CallFrame* callerFrame, CallLinkInfo&, const Vector<PolymorphicCallCase>&,
         UniqueArray<uint32_t>&& fastCounts);
-    
-    ~PolymorphicCallStubRoutine() final;
     
     CallVariantList variants() const;
     bool hasEdges() const;
@@ -102,12 +99,12 @@ public:
             functor(variant.get());
     }
 
-    bool visitWeak(VM&) final;
-
 private:
     template<typename Visitor> void markRequiredObjectsInternalImpl(Visitor&);
-    void markRequiredObjectsInternal(AbstractSlotVisitor&) final;
-    void markRequiredObjectsInternal(SlotVisitor&) final;
+    void markRequiredObjectsImpl(AbstractSlotVisitor&);
+    void markRequiredObjectsImpl(SlotVisitor&);
+
+    bool visitWeakImpl(VM&);
 
     FixedVector<WriteBarrier<JSCell>> m_variants;
     UniqueArray<uint32_t> m_fastCounts;

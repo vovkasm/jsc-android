@@ -164,7 +164,7 @@ struct AdaptiveStructureWatchpointAdaptor {
     static void add(CodeBlock*, const ObjectPropertyCondition&, WatchpointCollector&);
     static bool hasBeenInvalidated(const ObjectPropertyCondition& key)
     {
-        return !key.isWatchable();
+        return !key.isWatchable(PropertyCondition::MakeNoChanges);
     }
     static void dumpInContext(
         PrintStream& out, const ObjectPropertyCondition& key, DumpContext* context)
@@ -179,10 +179,7 @@ class GenericDesiredWatchpoints {
     typedef HashMap<WatchpointSetType, bool> StateMap;
 #endif
 public:
-    GenericDesiredWatchpoints()
-        : m_reallyAdded(false)
-    {
-    }
+    GenericDesiredWatchpoints() = default;
     
     void addLazily(const WatchpointSetType& set)
     {
@@ -227,7 +224,7 @@ public:
 
 private:
     HashSet<WatchpointSetType> m_sets;
-    bool m_reallyAdded;
+    bool m_reallyAdded { false };
 };
 
 class DesiredWatchpoints {

@@ -350,13 +350,9 @@ private:
         // enough things from them, deletes (or resizes) their backing store eagerly. Hence
         // HashMaps induce a lot of malloc traffic.
         static constexpr unsigned capacity = 100;
-    
-        SmallMaps()
-            : m_pureLength(0)
-            , m_impureLength(0)
-        {
-        }
-    
+
+        SmallMaps() = default;
+
         void clear()
         {
             m_pureLength = 0;
@@ -398,7 +394,11 @@ private:
         LazyNode addImpure(HeapLocation location, LazyNode node)
         {
             // FIXME: If we are using small maps, we must not def() derived values.
-            // For now the only derived values we def() are constant-based.
+            // This is because we rely on one node defining at most one value so
+            // that we can have constant capacity buffers for pure map and impure map.
+            // If we use the derived index inside heap location, this property doesn't hold.
+            // For example, if you look at NewArrayBuffer, it is a single node that can
+            // have an arbitrary number of defs.
             if (location.index() && !location.index().isNode())
                 return nullptr;
             if (LazyNode result = findReplacement(location))
@@ -411,16 +411,14 @@ private:
     private:
         WTF::KeyValuePair<PureValue, Node*> m_pureMap[capacity];
         WTF::KeyValuePair<HeapLocation, LazyNode> m_impureMap[capacity];
-        unsigned m_pureLength;
-        unsigned m_impureLength;
+        unsigned m_pureLength { 0 };
+        unsigned m_impureLength { 0 };
     };
 
     class LargeMaps {
     public:
-        LargeMaps()
-        {
-        }
-    
+        LargeMaps() = default;
+
         void clear()
         {
             m_pureMap.clear();
@@ -679,7 +677,7 @@ public:
         
         m_preOrder = m_graph.blocksInPreOrder();
         
-        // First figure out what gets clobbered by blocks. Node that this uses the preOrder list
+        // First figure out what gets clobbered by blocks. Note that this uses the preOrder list
         // for convenience only.
         for (unsigned i = m_preOrder.size(); i--;) {
             m_block = m_preOrder[i];
@@ -689,7 +687,7 @@ public:
         }
         
         // Based on my experience doing this before, what follows might have to be made iterative.
-        // Right now it doesn't have to be iterative because everything is dominator-bsed. But when
+        // Right now it doesn't have to be iterative because everything is dominator-based. But when
         // validation is enabled, we check if iterating would find new CSE opportunities.
 
         bool changed = iterate();
@@ -953,14 +951,11 @@ public:
     }
     
     struct ImpureBlockData {
-        ImpureBlockData()
-            : didVisit(false)
-        {
-        }
-        
+        ImpureBlockData() = default;
+
         ClobberSet writes;
         ImpureMap availableAtTail;
-        bool didVisit;
+        bool didVisit { false };
     };
     
     Vector<BasicBlock*> m_preOrder;

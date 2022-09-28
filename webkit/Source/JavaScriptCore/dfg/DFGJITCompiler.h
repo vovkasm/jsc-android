@@ -66,14 +66,14 @@ struct OSRExit;
 // Every CallLinkRecord contains a reference to the call instruction & the function
 // that it needs to be linked to.
 struct CallLinkRecord {
-    CallLinkRecord(MacroAssembler::Call call, FunctionPtr<OperationPtrTag> function)
+    CallLinkRecord(MacroAssembler::Call call, CodePtr<OperationPtrTag> function)
         : m_call(call)
         , m_function(function)
     {
     }
 
     MacroAssembler::Call m_call;
-    FunctionPtr<OperationPtrTag> m_function;
+    CodePtr<OperationPtrTag> m_function;
 };
 
 // === JITCompiler ===
@@ -141,14 +141,14 @@ public:
     }
 
     // Add a call out from JIT code, without an exception check.
-    Call appendCall(const FunctionPtr<CFunctionPtrTag> function)
+    Call appendCall(const CodePtr<CFunctionPtrTag> function)
     {
         Call functionCall = call(OperationPtrTag);
         m_calls.append(CallLinkRecord(functionCall, function.retagged<OperationPtrTag>()));
         return functionCall;
     }
 
-    Call appendOperationCall(const FunctionPtr<OperationPtrTag> function)
+    Call appendOperationCall(const CodePtr<OperationPtrTag> function)
     {
         Call functionCall = call(OperationPtrTag);
         m_calls.append(CallLinkRecord(functionCall, function));
@@ -162,9 +162,9 @@ public:
     
     void exceptionCheck();
 
-    void exceptionCheckWithCallFrameRollback()
+    void exceptionJumpWithCallFrameRollback()
     {
-        m_exceptionChecksWithCallFrameRollback.append(emitExceptionCheck(vm()));
+        m_exceptionChecksWithCallFrameRollback.append(jump());
     }
 
     OSRExitCompilationInfo& appendExitInfo(MacroAssembler::JumpList jumpsToFail = MacroAssembler::JumpList())
@@ -193,7 +193,12 @@ public:
     {
         m_getByVals.append(InlineCacheWrapper<JITGetByValGenerator>(gen, slowPath));
     }
-    
+
+    void addGetByValWithThis(const JITGetByValWithThisGenerator& gen, SlowPathGenerator* slowPath)
+    {
+        m_getByValsWithThis.append(InlineCacheWrapper<JITGetByValWithThisGenerator>(gen, slowPath));
+    }
+
     void addPutById(const JITPutByIdGenerator& gen, SlowPathGenerator* slowPath)
     {
         m_putByIds.append(InlineCacheWrapper<JITPutByIdGenerator>(gen, slowPath));
@@ -256,14 +261,6 @@ public:
     }
     
     template<typename T>
-    Jump branchWeakPtr(RelationalCondition cond, T left, JSCell* weakPtr)
-    {
-        Jump result = branchPtr(cond, left, TrustedImmPtr(weakPtr));
-        addWeakReference(weakPtr);
-        return result;
-    }
-
-    template<typename T>
     Jump branchWeakStructure(RelationalCondition cond, T left, RegisteredStructure weakStructure)
     {
         Structure* structure = weakStructure.get();
@@ -312,6 +309,75 @@ public:
         emitSaveCalleeSavesFor(&RegisterAtOffsetList::dfgCalleeSaveRegisters());
     }
 
+    class LinkableConstant final : public CCallHelpers::ConstantMaterializer {
+    public:
+        enum NonCellTag { NonCell };
+        LinkableConstant() = default;
+        LinkableConstant(JITCompiler&, JSCell*);
+        LinkableConstant(LinkerIR::Constant index)
+            : m_index(index)
+        { }
+
+        void materialize(CCallHelpers&, GPRReg);
+        void store(CCallHelpers&, CCallHelpers::Address);
+
+        template<typename T>
+        static LinkableConstant nonCellPointer(JITCompiler& jit, T* pointer)
+        {
+            static_assert(!std::is_base_of_v<JSCell, T>);
+            return LinkableConstant(jit, pointer, NonCell);
+        }
+
+        static LinkableConstant structure(JITCompiler& jit, RegisteredStructure structure)
+        {
+            return LinkableConstant(jit, structure.get());
+        }
+
+        bool isUnlinked() const { return m_index != UINT_MAX; }
+
+        void* pointer() const { return m_pointer; }
+        LinkerIR::Constant index() const { return m_index; }
+
+#if USE(JSVALUE64)
+        Address unlinkedAddress()
+        {
+            ASSERT(isUnlinked());
+            return Address(GPRInfo::constantsRegister, JITData::offsetOfData() + sizeof(void*) * m_index);
+        }
+#endif
+
+    private:
+        LinkableConstant(JITCompiler&, void*, NonCellTag);
+
+        LinkerIR::Constant m_index { UINT_MAX };
+        void* m_pointer { nullptr };
+    };
+
+    void loadConstant(LinkerIR::Constant, GPRReg);
+    void loadLinkableConstant(LinkableConstant, GPRReg);
+    void storeLinkableConstant(LinkableConstant, Address);
+
+    Jump branchLinkableConstant(RelationalCondition cond, GPRReg left, LinkableConstant constant)
+    {
+#if USE(JSVALUE64)
+        if (constant.isUnlinked())
+            return CCallHelpers::branchPtr(cond, left, constant.unlinkedAddress());
+#endif
+        return CCallHelpers::branchPtr(cond, left, CCallHelpers::TrustedImmPtr(constant.pointer()));
+    }
+
+    Jump branchLinkableConstant(RelationalCondition cond, Address left, LinkableConstant constant)
+    {
+#if USE(JSVALUE64)
+        if (constant.isUnlinked())
+            return CCallHelpers::branchPtr(cond, left, constant.unlinkedAddress());
+#endif
+        return CCallHelpers::branchPtr(cond, left, CCallHelpers::TrustedImmPtr(constant.pointer()));
+    }
+
+    std::tuple<CompileTimeStructureStubInfo, LinkableConstant> addStructureStubInfo();
+    LinkerIR::Constant addToConstantPool(LinkerIR::Type, void*);
+
 private:
     friend class OSRExitJumpPlaceholder;
     
@@ -323,7 +389,6 @@ private:
     void link(LinkBuffer&);
     
     void exitSpeculativeWithOSR(const OSRExit&, SpeculationRecovery*);
-    void compileExceptionHandlers();
     void linkOSRExits();
     void disassemble(LinkBuffer&);
 
@@ -374,6 +439,7 @@ private:
     Vector<InlineCacheWrapper<JITGetByIdGenerator>, 4> m_getByIds;
     Vector<InlineCacheWrapper<JITGetByIdWithThisGenerator>, 4> m_getByIdsWithThis;
     Vector<InlineCacheWrapper<JITGetByValGenerator>, 4> m_getByVals;
+    Vector<InlineCacheWrapper<JITGetByValWithThisGenerator>, 4> m_getByValsWithThis;
     Vector<InlineCacheWrapper<JITPutByIdGenerator>, 4> m_putByIds;
     Vector<InlineCacheWrapper<JITPutByValGenerator>, 4> m_putByVals;
     Vector<InlineCacheWrapper<JITDelByIdGenerator>, 4> m_delByIds;
@@ -389,6 +455,9 @@ private:
     Vector<DFG::OSREntryData> m_osrEntry;
     Vector<DFG::OSRExit> m_osrExit;
     Vector<DFG::SpeculationRecovery> m_speculationRecovery;
+    Vector<LinkerIR::Value> m_constantPool;
+    HashMap<LinkerIR::Value, LinkerIR::Constant, LinkerIR::ValueHash, LinkerIR::ValueTraits> m_constantPoolMap;
+    SegmentedVector<DFG::UnlinkedStructureStubInfo> m_unlinkedStubInfos;
     
     struct ExceptionHandlingOSRExitInfo {
         OSRExitCompilationInfo& exitInfo;

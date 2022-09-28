@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2021 Apple Inc. All rights reserved.
+ * Copyright (C) 2008-2022 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,6 +37,8 @@ using Assembler = TARGET_ASSEMBLER;
 
 class MacroAssemblerX86Common : public AbstractMacroAssembler<Assembler> {
 public:
+    static constexpr size_t nearJumpRange = 2 * GB;
+
 #if CPU(X86_64)
     // Use this directly only if you're not generating code with it.
     static constexpr X86Registers::RegisterID s_scratchRegister = X86Registers::r11;
@@ -101,9 +103,9 @@ public:
         DoubleLessThanOrUnordered = X86Assembler::ConditionB,
         DoubleLessThanOrEqualOrUnordered = X86Assembler::ConditionBE,
     };
-    COMPILE_ASSERT(
+    static_assert(
         !((X86Assembler::ConditionE | X86Assembler::ConditionNE | X86Assembler::ConditionA | X86Assembler::ConditionAE | X86Assembler::ConditionB | X86Assembler::ConditionBE) & DoubleConditionBits),
-        DoubleConditionBits_should_not_interfere_with_X86Assembler_Condition_codes);
+        "DoubleConditionBits should not interfere with X86Assembler Condition codes");
 
     static constexpr RegisterID stackPointerRegister = X86Registers::esp;
     static constexpr RegisterID framePointerRegister = X86Registers::ebp;
@@ -1235,13 +1237,6 @@ public:
         load16(address, dest);
     }
 
-    template<PtrTag tag>
-    static void repatchCompact(CodeLocationDataLabelCompact<tag> dataLabelCompact, int32_t value)
-    {
-        ASSERT(isCompactPtrAlignedAddressOffset(value));
-        AssemblerType_T::repatchCompact(dataLabelCompact.dataLocation(), value);
-    }
-    
     DataLabelCompact loadCompactWithAddressOffsetPatch(Address address, RegisterID dest)
     {
         padBeforePatch();
@@ -3936,13 +3931,13 @@ public:
     template<PtrTag tag>
     static void replaceWithVMHalt(CodeLocationLabel<tag> instructionStart)
     {
-        X86Assembler::replaceWithHlt(instructionStart.executableAddress());
+        X86Assembler::replaceWithHlt(instructionStart.taggedPtr());
     }
 
     template<PtrTag startTag, PtrTag destTag>
     static void replaceWithJump(CodeLocationLabel<startTag> instructionStart, CodeLocationLabel<destTag> destination)
     {
-        X86Assembler::replaceWithJump(instructionStart.executableAddress(), destination.executableAddress());
+        X86Assembler::replaceWithJump(instructionStart.taggedPtr(), destination.taggedPtr());
     }
     
     static ptrdiff_t maxJumpReplacementSize()

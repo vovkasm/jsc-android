@@ -29,6 +29,7 @@
 
 #include "CodeLocation.h"
 #include <wtf/Forward.h>
+#include <wtf/text/ASCIILiteral.h>
 
 namespace JSC {
 namespace Wasm {
@@ -52,9 +53,7 @@ struct HandlerInfoBase {
 };
 
 struct UnlinkedHandlerInfo : public HandlerInfoBase {
-    UnlinkedHandlerInfo()
-    {
-    }
+    UnlinkedHandlerInfo() = default;
 
     UnlinkedHandlerInfo(HandlerType handlerType, uint32_t start, uint32_t end, uint32_t target, uint32_t tryDepth, uint32_t exceptionIndexOrDelegateTarget)
     {
@@ -65,12 +64,28 @@ struct UnlinkedHandlerInfo : public HandlerInfoBase {
         m_tryDepth = tryDepth;
         m_exceptionIndexOrDelegateTarget = exceptionIndexOrDelegateTarget;
     }
+
+    ASCIILiteral typeName() const
+    {
+        switch (m_type) {
+        case HandlerType::Catch:
+            return "catch"_s;
+        case HandlerType::CatchAll:
+            return "catchall"_s;
+        case HandlerType::Delegate:
+            return "delegate"_s;
+        default:
+            ASSERT_NOT_REACHED();
+            break;
+        }
+        return { };
+    }
 };
 
 struct HandlerInfo : public HandlerInfoBase {
     static const HandlerInfo* handlerForIndex(Instance&, const FixedVector<HandlerInfo>& exeptionHandlers, unsigned index, const Wasm::Tag* exceptionTag);
 
-    void initialize(const UnlinkedHandlerInfo&, MacroAssemblerCodePtr<ExceptionHandlerPtrTag>);
+    void initialize(const UnlinkedHandlerInfo&, CodePtr<ExceptionHandlerPtrTag>);
 
     unsigned tag() const
     {
@@ -84,7 +99,7 @@ struct HandlerInfo : public HandlerInfoBase {
         return m_delegateTarget;
     }
 
-    MacroAssemblerCodePtr<ExceptionHandlerPtrTag> m_nativeCode;
+    CodePtr<ExceptionHandlerPtrTag> m_nativeCode;
 
 private:
     union {

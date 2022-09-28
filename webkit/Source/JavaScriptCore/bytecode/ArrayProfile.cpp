@@ -120,12 +120,11 @@ void dumpArrayModes(PrintStream& out, ArrayModes arrayModes)
 
 void ArrayProfile::computeUpdatedPrediction(const ConcurrentJSLocker& locker, CodeBlock* codeBlock)
 {
-    if (!m_lastSeenStructureID)
+    auto lastSeenStructureID = std::exchange(m_lastSeenStructureID, StructureID());
+    if (!lastSeenStructureID)
         return;
-    
-    Structure* lastSeenStructure = m_lastSeenStructureID.decode();
-    computeUpdatedPrediction(locker, codeBlock, lastSeenStructure);
-    m_lastSeenStructureID = StructureID();
+
+    computeUpdatedPrediction(locker, codeBlock, lastSeenStructureID.decode());
 }
 
 void ArrayProfile::computeUpdatedPrediction(const ConcurrentJSLocker&, CodeBlock* codeBlock, Structure* lastSeenStructure)
@@ -146,18 +145,18 @@ void ArrayProfile::computeUpdatedPrediction(const ConcurrentJSLocker&, CodeBlock
         m_usesOriginalArrayStructures = false;
 }
 
-void ArrayProfile::observeIndexedRead(VM& vm, JSCell* cell, unsigned index)
+void ArrayProfile::observeIndexedRead(JSCell* cell, unsigned index)
 {
     m_lastSeenStructureID = cell->structureID();
 
-    if (JSObject* object = jsDynamicCast<JSObject*>(vm, cell)) {
+    if (JSObject* object = jsDynamicCast<JSObject*>(cell)) {
         if (hasAnyArrayStorage(object->indexingType()) && index >= object->getVectorLength())
             setOutOfBounds();
         else if (index >= object->getArrayLength())
             setOutOfBounds();
     }
 
-    if (JSString* string = jsDynamicCast<JSString*>(vm, cell)) {
+    if (JSString* string = jsDynamicCast<JSString*>(cell)) {
         if (index >= string->length())
             setOutOfBounds();
     }

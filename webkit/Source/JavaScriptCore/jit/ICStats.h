@@ -52,6 +52,7 @@ namespace JSC {
     macro(OperationGetByIdOptimize) \
     macro(OperationGetByValOptimize) \
     macro(OperationGetByIdWithThisOptimize) \
+    macro(OperationGetByValWithThisOptimize) \
     macro(OperationGenericIn) \
     macro(OperationInByIdGeneric) \
     macro(OperationInByIdOptimize) \
@@ -96,10 +97,8 @@ public:
         ProtoLookup
     };
 
-    ICEvent()
-    {
-    }
-    
+    ICEvent() = default;
+
     ICEvent(Kind kind, const ClassInfo* classInfo, const Identifier propertyName)
         : m_kind(kind)
         , m_classInfo(classInfo)

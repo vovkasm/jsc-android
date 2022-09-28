@@ -492,6 +492,8 @@ op :get_by_val_with_this,
     },
     metadata: {
         profile: ValueProfile,
+        arrayProfile: ArrayProfile,
+        seenIdentifiers: GetByValHistory,
     }
 
 op :get_by_id_direct,
@@ -860,12 +862,14 @@ op :tail_call,
         profile: ValueProfile,
     }
 
-op :call_eval,
+op :call_direct_eval,
     args: {
         dst: VirtualRegister,
         callee: VirtualRegister,
         argc: unsigned,
         argv: unsigned,
+        thisValue: VirtualRegister,
+        scope: VirtualRegister,
         ecmaMode: ECMAMode,
     },
     metadata: {
@@ -1462,7 +1466,7 @@ op :op_iterator_next_slow_return_location
 op :op_tail_call_slow_return_location
 op :op_tail_call_forward_arguments_slow_return_location
 op :op_tail_call_varargs_slow_return_location
-op :op_call_eval_slow_return_location
+op :op_call_direct_eval_slow_return_location
 
 op :js_trampoline_op_call
 op :js_trampoline_op_construct
@@ -1477,7 +1481,7 @@ op :js_trampoline_op_call_varargs_slow
 op :js_trampoline_op_tail_call_varargs_slow
 op :js_trampoline_op_tail_call_forward_arguments_slow
 op :js_trampoline_op_construct_varargs_slow
-op :js_trampoline_op_call_eval_slow
+op :js_trampoline_op_call_direct_eval_slow
 op :js_trampoline_op_iterator_next_slow
 op :js_trampoline_op_iterator_open_slow
 op :js_trampoline_llint_function_for_call_arity_check_untag
@@ -1689,7 +1693,7 @@ op :call_no_tls,
 op :call_indirect,
     args: {
         functionIndex: VirtualRegister,
-        signatureIndex: unsigned,
+        typeIndex: unsigned,
         stackOffset: unsigned,
         numberOfStackArgs: unsigned,
         tableIndex: unsigned,
@@ -1698,7 +1702,7 @@ op :call_indirect,
 op :call_indirect_no_tls,
     args: {
         functionIndex: VirtualRegister,
-        signatureIndex: unsigned,
+        typeIndex: unsigned,
         stackOffset: unsigned,
         numberOfStackArgs: unsigned,
         tableIndex: unsigned,
@@ -1707,7 +1711,7 @@ op :call_indirect_no_tls,
 op :call_ref,
     args: {
         functionReference: VirtualRegister,
-        signatureIndex: unsigned,
+        typeIndex: unsigned,
         stackOffset: unsigned,
         numberOfStackArgs: unsigned,
     }
@@ -1715,7 +1719,7 @@ op :call_ref,
 op :call_ref_no_tls,
     args: {
         functionReference: VirtualRegister,
-        signatureIndex: unsigned,
+        typeIndex: unsigned,
         stackOffset: unsigned,
         numberOfStackArgs: unsigned,
     }
@@ -1890,6 +1894,24 @@ op_group :CatchAll,
     ],
     args: {
         exception: VirtualRegister,
+    }
+
+op :i31_new,
+    args: {
+        dst: VirtualRegister,
+        value: VirtualRegister,
+    }
+
+op :i31_get_s,
+    args: {
+        dst: VirtualRegister,
+        ref: VirtualRegister,
+    }
+
+op :i31_get_u,
+    args: {
+        dst: VirtualRegister,
+        ref: VirtualRegister,
     }
 
 end_section :Wasm

@@ -39,29 +39,21 @@
 
 namespace JSC {
 
-const ClassInfo UnlinkedCodeBlock::s_info = { "UnlinkedCodeBlock", nullptr, nullptr, nullptr, CREATE_METHOD_TABLE(UnlinkedCodeBlock) };
+const ClassInfo UnlinkedCodeBlock::s_info = { "UnlinkedCodeBlock"_s, nullptr, nullptr, nullptr, CREATE_METHOD_TABLE(UnlinkedCodeBlock) };
 
 UnlinkedCodeBlock::UnlinkedCodeBlock(VM& vm, Structure* structure, CodeType codeType, const ExecutableInfo& info, OptionSet<CodeGenerationMode> codeGenerationMode)
     : Base(vm, structure)
-    , m_numVars(0)
-    , m_usesCallEval(false)
-    , m_numCalleeLocals(0)
     , m_isConstructor(info.isConstructor())
-    , m_numParameters(0)
-    , m_hasCapturedVariables(false)
     , m_isBuiltinFunction(info.isBuiltinFunction())
     , m_superBinding(static_cast<unsigned>(info.superBinding()))
     , m_scriptMode(static_cast<unsigned>(info.scriptMode()))
     , m_isArrowFunctionContext(info.isArrowFunctionContext())
     , m_isClassContext(info.isClassContext())
-    , m_hasTailCalls(false)
     , m_constructorKind(static_cast<unsigned>(info.constructorKind()))
     , m_derivedContextType(static_cast<unsigned>(info.derivedContextType()))
     , m_evalContextType(static_cast<unsigned>(info.evalContextType()))
     , m_codeType(static_cast<unsigned>(codeType))
     , m_didOptimize(static_cast<unsigned>(TriState::Indeterminate))
-    , m_age(0)
-    , m_hasCheckpoints(false)
     , m_parseMode(info.parseMode())
     , m_codeGenerationMode(codeGenerationMode)
     , m_metadata(UnlinkedMetadataTable::create())
@@ -184,7 +176,7 @@ inline void UnlinkedCodeBlock::getLineAndColumn(const ExpressionRangeInfo& info,
 }
 
 #ifndef NDEBUG
-static void dumpLineColumnEntry(size_t index, const InstructionStream& instructionStream, unsigned instructionOffset, unsigned line, unsigned column)
+static void dumpLineColumnEntry(size_t index, const JSInstructionStream& instructionStream, unsigned instructionOffset, unsigned line, unsigned column)
 {
     const auto instruction = instructionStream.at(instructionOffset);
     const char* event = "";
@@ -294,7 +286,7 @@ UnlinkedCodeBlock::~UnlinkedCodeBlock()
     }
 }
 
-const InstructionStream& UnlinkedCodeBlock::instructions() const
+const JSInstructionStream& UnlinkedCodeBlock::instructions() const
 {
     ASSERT(m_instructions.get());
     return *m_instructions;
@@ -332,7 +324,7 @@ BytecodeLivenessAnalysis& UnlinkedCodeBlock::livenessAnalysisSlow(CodeBlock* cod
     return *m_liveness;
 }
 
-int UnlinkedCodeBlock::outOfLineJumpOffset(InstructionStream::Offset bytecodeOffset)
+int UnlinkedCodeBlock::outOfLineJumpOffset(JSInstructionStream::Offset bytecodeOffset)
 {
     ASSERT(m_outOfLineJumpTargets.contains(bytecodeOffset));
     return m_outOfLineJumpTargets.get(bytecodeOffset);

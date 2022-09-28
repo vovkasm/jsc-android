@@ -63,7 +63,7 @@ inline std::tuple<int, std::optional<int>> toSystemSignal(Signal signal)
     switch (signal) {
     case Signal::AccessFault: return std::make_tuple(SIGSEGV, SIGBUS);
     case Signal::IllegalInstruction: return std::make_tuple(SIGILL, std::nullopt);
-    case Signal::Usr: return std::make_tuple(SIGILL, std::nullopt);
+    case Signal::Usr: return std::make_tuple(SIGUSR2, std::nullopt);
     case Signal::FloatingPoint: return std::make_tuple(SIGFPE, std::nullopt);
     case Signal::Breakpoint: return std::make_tuple(SIGTRAP, std::nullopt);
 #if !OS(DARWIN)
@@ -97,7 +97,7 @@ enum class SignalAction {
 };
 
 struct SigInfo {
-    void* faultingAddress { 0 };
+    void* faultingAddress { nullptr };
 };
 
 using SignalHandler = Function<SignalAction(Signal, SigInfo&, PlatformRegisters&)>;

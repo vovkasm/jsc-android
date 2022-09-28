@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Apple Inc. All rights reserved.
+ * Copyright (C) 2020-2022 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,7 +27,7 @@
 
 namespace JSC {
 
-#if ENABLE(JIT_OPERATION_VALIDATION) || CPU(ARM64E)
+#if ENABLE(JIT_OPERATION_VALIDATION) || ENABLE(JIT_OPERATION_DISASSEMBLY) || CPU(ARM64E)
 
 #define JSC_UTILITY_GATES(v) \
     v(jitCagePtr, NoPtrTag) \
@@ -61,7 +61,7 @@ namespace JSC {
     v(op_tail_call_varargs_slow, JSEntryPtrTag) \
     v(op_tail_call_forward_arguments_slow, JSEntryPtrTag) \
     v(op_construct_varargs_slow, JSEntryPtrTag) \
-    v(op_call_eval_slow, JSEntrySlowPathPtrTag) \
+    v(op_call_direct_eval_slow, JSEntrySlowPathPtrTag) \
 
 #if ENABLE(WEBASSEMBLY)
 
@@ -91,9 +91,12 @@ enum class Gate : uint8_t {
 static constexpr unsigned numberOfGates = (JSC_UTILITY_GATES(JSC_COUNT)) + (JSC_JS_GATE_OPCODES(JSC_OPCODE_COUNT)) + (JSC_WASM_GATE_OPCODES(JSC_OPCODE_COUNT));
 #undef JSC_COUNT
 #undef JSC_OPCODE_COUNT
-#else
+
+#else // not (ENABLE(JIT_OPERATION_VALIDATION) || ENABLE(JIT_OPERATION_DISASSEMBLY) || CPU(ARM64E))
+
 // Keep it non-zero to make JSCConfig's array not [0].
 static constexpr unsigned numberOfGates = 1;
-#endif
 
-}
+#endif // ENABLE(JIT_OPERATION_VALIDATION) || ENABLE(JIT_OPERATION_DISASSEMBLY) || CPU(ARM64E)
+
+} // namespace JSC

@@ -52,7 +52,6 @@ class ConfigFileScanner {
 public:
     ConfigFileScanner(const char* filename)
         : m_filename(filename)
-        , m_lineNumber(0)
     {
         m_srcPtr = &m_buffer[0];
         m_bufferEnd = &m_buffer[0];
@@ -231,7 +230,7 @@ private:
     }
 
     const char* m_filename;
-    unsigned m_lineNumber;
+    unsigned m_lineNumber { 0 };
     FILE* m_file;
     char m_buffer[BUFSIZ];
     char* m_srcPtr;
@@ -243,7 +242,9 @@ ConfigFile::ConfigFile(const char* filename)
     if (!filename)
         m_filename[0] = '\0';
     else {
+        IGNORE_GCC_WARNINGS_BEGIN("stringop-truncation")
         strncpy(m_filename, filename, s_maxPathLength);
+        IGNORE_GCC_WARNINGS_END
         m_filename[s_maxPathLength] = '\0';
     }
 

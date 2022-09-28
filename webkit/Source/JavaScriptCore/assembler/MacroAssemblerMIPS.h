@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2021 Apple Inc. All rights reserved.
+ * Copyright (C) 2008-2022 Apple Inc. All rights reserved.
  * Copyright (C) 2010 MIPS Technologies, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,10 +41,9 @@ public:
     static constexpr unsigned numGPRs = 32;
     static constexpr unsigned numFPRs = 32;
 
-    MacroAssemblerMIPS()
-        : m_fixedWidth(false)
-    {
-    }
+    static constexpr size_t nearJumpRange = 2 * GB;
+
+    MacroAssemblerMIPS() = default;
 
     static bool isCompactPtrAlignedAddressOffset(ptrdiff_t value)
     {
@@ -1336,6 +1335,12 @@ public:
         }
     }
 
+    void loadPair32(AbsoluteAddress address, RegisterID dest1, RegisterID dest2)
+    {
+        move(TrustedImmPtr(address.m_ptr), addrTempRegister);
+        loadPair32(addrTempRegister, dest1, dest2);
+    }
+
     void loadPair32(BaseIndex address, RegisterID dest1, RegisterID dest2)
     {
         if (address.base == dest1 || address.index == dest1) {
@@ -1643,6 +1648,30 @@ public:
         }
     }
 
+    void storePair32(RegisterID src1, TrustedImm32 imm, Address address)
+    {
+        move(imm, addrTempRegister);
+        storePair32(src1, addrTempRegister, address);
+    }
+
+    void storePair32(TrustedImmPtr immPtr, TrustedImm32 imm32, Address address)
+    {
+        move(immPtr, addrTempRegister);
+        move(imm32, dataTempRegister);
+        storePair32(addrTempRegister, dataTempRegister, address);
+    }
+
+    void storePair32(TrustedImm32 imm1, TrustedImm32 imm2, Address address)
+    {
+        move(imm1, addrTempRegister);
+        RegisterID scratch = addrTempRegister;
+        if (imm1.m_value != imm2.m_value) {
+            scratch = dataTempRegister;
+            move(imm2, scratch);
+        }
+        storePair32(addrTempRegister, scratch, address);
+    }
+
     void storePair32(RegisterID src1, RegisterID src2, RegisterID dest)
     {
         storePair32(src1, src2, dest, TrustedImm32(0));
@@ -1663,6 +1692,19 @@ public:
     {
         store32(src1, address);
         store32(src2, address.withOffset(4));
+    }
+
+    void storePair32(TrustedImm32 imm1, TrustedImm32 imm2, BaseIndex address)
+    {
+        store32(imm1, address);
+        store32(imm2, address.withOffset(4));
+    }
+
+    void storePair32(RegisterID src1, TrustedImm32 imm, const void* address)
+    {
+        move(TrustedImmPtr(address), addrTempRegister);
+        move(imm, dataTempRegister);
+        storePair32(src1, dataTempRegister, addrTempRegister);
     }
 
     void storePair32(RegisterID src1, RegisterID src2, const void* address)
@@ -3656,9 +3698,9 @@ public:
     }
 
     template<PtrTag resultTag, PtrTag locationTag>
-    static FunctionPtr<resultTag> readCallTarget(CodeLocationCall<locationTag> call)
+    static CodePtr<resultTag> readCallTarget(CodeLocationCall<locationTag> call)
     {
-        return FunctionPtr<resultTag>(reinterpret_cast<void(*)()>(MIPSAssembler::readCallTarget(call.dataLocation())));
+        return CodePtr<resultTag>(reinterpret_cast<void(*)()>(MIPSAssembler::readCallTarget(call.dataLocation())));
     }
 
     template<PtrTag startTag, PtrTag destTag>
@@ -3722,29 +3764,29 @@ public:
     template<PtrTag callTag, PtrTag destTag>
     static void repatchCall(CodeLocationCall<callTag> call, CodeLocationLabel<destTag> destination)
     {
-        MIPSAssembler::relinkCall(call.dataLocation(), destination.executableAddress());
+        MIPSAssembler::relinkCall(call.dataLocation(), destination.taggedPtr());
     }
 
     template<PtrTag callTag, PtrTag destTag>
-    static void repatchCall(CodeLocationCall<callTag> call, FunctionPtr<destTag> destination)
+    static void repatchCall(CodeLocationCall<callTag> call, CodePtr<destTag> destination)
     {
-        MIPSAssembler::relinkCall(call.dataLocation(), destination.executableAddress());
+        MIPSAssembler::relinkCall(call.dataLocation(), destination.taggedPtr());
     }
 
 private:
     // If m_fixedWidth is true, we will generate a fixed number of instructions.
     // Otherwise, we can emit any number of instructions.
-    bool m_fixedWidth;
+    bool m_fixedWidth { false };
 
     friend class LinkBuffer;
 
     template<PtrTag tag>
-    static void linkCall(void* code, Call call, FunctionPtr<tag> function)
+    static void linkCall(void* code, Call call, CodePtr<tag> function)
     {
         if (call.isFlagSet(Call::Tail))
-            MIPSAssembler::linkJump(code, call.m_label, function.executableAddress());
+            MIPSAssembler::linkJump(code, call.m_label, function.taggedPtr());
         else
-            MIPSAssembler::linkCall(code, call.m_label, function.executableAddress());
+            MIPSAssembler::linkCall(code, call.m_label, function.taggedPtr());
     }
 
 };

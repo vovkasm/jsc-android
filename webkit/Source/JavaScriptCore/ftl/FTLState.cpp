@@ -157,9 +157,17 @@ void State::dumpDisassembly(PrintStream& out, const ScopedLambda<void(DFG::Node*
     linkBuffer.didAlreadyDisassemble();
 }
 
-State::~State()
+State::~State() = default;
+
+StructureStubInfo* State::addStructureStubInfo()
 {
+    ASSERT(!graph.m_plan.isUnlinked());
+    auto* stubInfo = jitCode->common.m_stubInfos.add();
+    stubInfo->useDataIC = Options::useDataICInFTL();
+    return stubInfo;
 }
+
+
 
 } } // namespace JSC::FTL
 

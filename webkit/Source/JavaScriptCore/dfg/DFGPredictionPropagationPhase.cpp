@@ -891,7 +891,7 @@ private:
         case Construct:
         case DirectConstruct:
         case CallVarargs:
-        case CallEval:
+        case CallDirectEval:
         case TailCallVarargsInlinedCaller:
         case ConstructVarargs:
         case CallForwardVarargs:
@@ -1077,6 +1077,10 @@ private:
             setPrediction(SpecOther);
             break;
         }
+
+        case ResolveRope:
+            setPrediction(SpecString);
+            break;
 
         case CheckJSCast:
         case CheckNotJSCast:

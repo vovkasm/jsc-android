@@ -58,13 +58,11 @@ __PAS_BEGIN_EXTERN_C;
 #if defined(PAS_LIBMALLOC) && PAS_LIBMALLOC
 #define __PAS_API __attribute__((visibility("hidden")))
 #else
-#define __PAS_API
+#define __PAS_API __attribute__((visibility("default")))
 #endif
 
 #if defined(PAS_BMALLOC) && PAS_BMALLOC
-// #define __PAS_BAPI __attribute__((visibility("default")))
-// We build bmalloc as static library, and dont want to expose pas symbols in libjsc.so
-#define __PAS_BAPI __PAS_API
+#define __PAS_BAPI __attribute__((visibility("default")))
 #else
 #define __PAS_BAPI __PAS_API
 #endif

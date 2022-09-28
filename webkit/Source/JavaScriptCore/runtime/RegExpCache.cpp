@@ -49,14 +49,13 @@ RegExp* RegExpCache::lookupOrCreate(const String& patternString, OptionSet<Yarr:
 }
 
 RegExpCache::RegExpCache(VM* vm)
-    : m_nextEntryInStrongCache(0)
-    , m_vm(vm)
+    : m_vm(vm)
 {
 }
 
 RegExp* RegExpCache::ensureEmptyRegExpSlow(VM& vm)
 {
-    RegExp* regExp = RegExp::create(vm, "", { });
+    RegExp* regExp = RegExp::create(vm, emptyString(), { });
     m_emptyRegExp.set(vm, regExp);
     return regExp;
 }

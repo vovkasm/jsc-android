@@ -128,8 +128,9 @@ public:
     WTF_EXPORT_PRIVATE ForbidMallocUseForCurrentThreadScope();
     WTF_EXPORT_PRIVATE ~ForbidMallocUseForCurrentThreadScope();
 #else
-    ForbidMallocUseForCurrentThreadScope() = default;
-    ~ForbidMallocUseForCurrentThreadScope() { }
+    // Left an empty body on purpose, or we get several unused variable warnings
+    ForbidMallocUseForCurrentThreadScope() { } // NOLINT
+    ~ForbidMallocUseForCurrentThreadScope() = default;
 #endif
 
     ForbidMallocUseForCurrentThreadScope(const ForbidMallocUseForCurrentThreadScope&) = delete;
@@ -144,8 +145,9 @@ public:
     WTF_EXPORT_PRIVATE DisableMallocRestrictionsForCurrentThreadScope();
     WTF_EXPORT_PRIVATE ~DisableMallocRestrictionsForCurrentThreadScope();
 #else
-    DisableMallocRestrictionsForCurrentThreadScope() = default;
-    ~DisableMallocRestrictionsForCurrentThreadScope() { }
+    // Left an empty body on purpose, or we get several unused variable warnings
+    DisableMallocRestrictionsForCurrentThreadScope() { } // NOLINT
+    ~DisableMallocRestrictionsForCurrentThreadScope() = default;
 #endif
 
     DisableMallocRestrictionsForCurrentThreadScope(const DisableMallocRestrictionsForCurrentThreadScope&) = delete;
@@ -254,7 +256,7 @@ struct FastMalloc {
 
 template<typename T>
 struct FastFree {
-    static_assert(std::is_trivially_destructible<T>::value, "");
+    static_assert(std::is_trivially_destructible<T>::value);
 
     void operator()(T* pointer) const
     {
@@ -264,7 +266,7 @@ struct FastFree {
 
 template<typename T>
 struct FastFree<T[]> {
-    static_assert(std::is_trivially_destructible<T>::value, "");
+    static_assert(std::is_trivially_destructible<T>::value);
 
     void operator()(T* pointer) const
     {
@@ -338,6 +340,10 @@ using WTF::fastAlignedFree;
         ASSERT(location); \
         return location; \
     } \
+    static void freeAfterDestruction(void* p) \
+    { \
+        ::WTF::fastFree(p); \
+    } \
     using webkitFastMalloced = int; \
 
 // FIXME: WTF_MAKE_FAST_ALLOCATED should take class name so that we can create malloc_zone per this macro.
@@ -381,6 +387,10 @@ using __thisIsHereToForceASemicolonAfterThisMacro UNUSED_TYPE_ALIAS = int
     { \
         ASSERT(location); \
         return location; \
+    } \
+    static void freeAfterDestruction(void* p) \
+    { \
+        classname##Malloc::free(p); \
     } \
     using webkitFastMalloced = int; \
 

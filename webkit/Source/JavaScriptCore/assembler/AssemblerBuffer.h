@@ -293,12 +293,6 @@ namespace JSC {
     class AssemblerBuffer {
     public:
         AssemblerBuffer()
-            : m_storage()
-            , m_index(0)
-#if CPU(ARM64E)
-            , m_hash()
-            , m_hashes()
-#endif
         {
             auto& threadSpecificData = threadSpecificAssemblerData();
             m_storage.takeBufferIfLarger(WTFMove(*threadSpecificData));
@@ -456,7 +450,7 @@ namespace JSC {
         void putIntegralUnchecked(IntegralType value)
         {
 #if CPU(ARM64)
-            static_assert(sizeof(value) == 4, "");
+            static_assert(sizeof(value) == 4);
 #if CPU(ARM64E)
             uint32_t hash = m_hash.update(value, m_index / sizeof(IntegralType));
             WTF::unalignedStore<uint32_t>(m_hashes.buffer() + m_index, hash);
@@ -490,7 +484,7 @@ namespace JSC {
         friend LinkBuffer;
 
         AssemblerData m_storage;
-        unsigned m_index;
+        unsigned m_index { 0 };
 #if CPU(ARM64E)
         ARM64EHash<ShouldSign::Yes> m_hash;
         AssemblerData m_hashes;

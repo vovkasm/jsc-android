@@ -251,6 +251,7 @@ namespace JSC { namespace DFG {
     macro(Arrayify, NodeMustGenerate) \
     macro(ArrayifyToStructure, NodeMustGenerate) \
     macro(GetIndexedPropertyStorage, NodeResultStorage) \
+    macro(ResolveRope, NodeResultJS) \
     macro(ConstantStoragePointer, NodeResultStorage) \
     macro(GetGetter, NodeResultJS) \
     macro(GetSetter, NodeResultJS) \
@@ -360,7 +361,7 @@ namespace JSC { namespace DFG {
     macro(DirectTailCallInlinedCaller, NodeResultJS | NodeMustGenerate | NodeHasVarArgs) \
     macro(TailCallVarargsInlinedCaller, NodeResultJS | NodeMustGenerate) \
     macro(TailCallForwardVarargsInlinedCaller, NodeResultJS | NodeMustGenerate) \
-    macro(CallEval, NodeResultJS | NodeMustGenerate | NodeHasVarArgs) \
+    macro(CallDirectEval, NodeResultJS | NodeMustGenerate | NodeHasVarArgs) \
     \
     /* Shadow Chicken */\
     macro(LogShadowChickenPrologue, NodeMustGenerate) \

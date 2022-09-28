@@ -143,8 +143,6 @@ public:
     void initializeLoopHintExecutionCounter();
 
     bool isConstructor() const { return m_isConstructor; }
-    bool usesCallEval() const { return m_usesCallEval; }
-    void setUsesCallEval() { m_usesCallEval = true; }
     SourceParseMode parseMode() const { return m_parseMode; }
     bool isArrowFunction() const { return isArrowFunctionParseMode(parseMode()); }
     DerivedContextType derivedContextType() const { return static_cast<DerivedContextType>(m_derivedContextType); }
@@ -154,6 +152,7 @@ public:
     bool hasTailCalls() const { return m_hasTailCalls; }
     void setHasTailCalls() { m_hasTailCalls = true; }
     bool allowDirectEvalCache() const { return !(m_features & NoEvalCacheFeature); }
+    bool usesImportMeta() const { return m_features & ImportMetaFeature; }
 
     bool hasExpressionInfo() { return m_expressionInfo.size(); }
     const FixedVector<ExpressionRangeInfo>& expressionInfo() { return m_expressionInfo; }
@@ -211,12 +210,12 @@ public:
     SuperBinding superBinding() const { return static_cast<SuperBinding>(m_superBinding); }
     JSParserScriptMode scriptMode() const { return static_cast<JSParserScriptMode>(m_scriptMode); }
 
-    const InstructionStream& instructions() const;
-    const Instruction* instructionAt(BytecodeIndex index) const { return instructions().at(index).ptr(); }
-    unsigned bytecodeOffset(const Instruction* instruction)
+    const JSInstructionStream& instructions() const;
+    const JSInstruction* instructionAt(BytecodeIndex index) const { return instructions().at(index).ptr(); }
+    unsigned bytecodeOffset(const JSInstruction* instruction)
     {
         const auto* instructionsBegin = instructions().at(0).ptr();
-        const auto* instructionsEnd = reinterpret_cast<const Instruction*>(reinterpret_cast<uintptr_t>(instructionsBegin) + instructions().size());
+        const auto* instructionsEnd = reinterpret_cast<const JSInstruction*>(reinterpret_cast<uintptr_t>(instructionsBegin) + instructions().size());
         RELEASE_ASSERT(instruction >= instructionsBegin && instruction < instructionsEnd);
         return instruction - instructionsBegin;
     }
@@ -278,7 +277,7 @@ public:
     ALWAYS_INLINE unsigned startColumn() const { return 0; }
     unsigned endColumn() const { return m_endColumn; }
 
-    const FixedVector<InstructionStream::Offset>& opProfileControlFlowBytecodeOffsets() const
+    const FixedVector<JSInstructionStream::Offset>& opProfileControlFlowBytecodeOffsets() const
     {
         ASSERT(m_rareData);
         return m_rareData->m_opProfileControlFlowBytecodeOffsets;
@@ -400,28 +399,27 @@ private:
     VirtualRegister m_thisRegister;
     VirtualRegister m_scopeRegister;
 
-    unsigned m_numVars : 31;
-    unsigned m_usesCallEval : 1;
-    unsigned m_numCalleeLocals : 31;
+    unsigned m_numVars : 31 { 0 };
+    unsigned m_numCalleeLocals : 31 { 0 };
     unsigned m_isConstructor : 1;
-    unsigned m_numParameters : 31;
-    unsigned m_hasCapturedVariables : 1;
+    unsigned m_numParameters : 31 { 0 };
+    unsigned m_hasCapturedVariables : 1 { false };
 
     unsigned m_isBuiltinFunction : 1;
     unsigned m_superBinding : 1;
     unsigned m_scriptMode: 1;
     unsigned m_isArrowFunctionContext : 1;
     unsigned m_isClassContext : 1;
-    unsigned m_hasTailCalls : 1;
+    unsigned m_hasTailCalls : 1 { false };
     unsigned m_constructorKind : 2;
     unsigned m_derivedContextType : 2;
     unsigned m_evalContextType : 2;
     unsigned m_codeType : 2;
     unsigned m_didOptimize : 2;
-    unsigned m_age : 3;
+    unsigned m_age : 3 { 0 };
     static_assert(((1U << 3) - 1) >= maxAge);
-    bool m_hasCheckpoints : 1;
-    unsigned m_lexicalScopeFeatures : 4;
+    bool m_hasCheckpoints : 1 { false };
+    unsigned m_lexicalScopeFeatures : bitWidthOfLexicalScopeFeatures;
 public:
     ConcurrentJSLock m_lock;
 #if ENABLE(JIT)
@@ -438,9 +436,9 @@ private:
     PackedRefPtr<StringImpl> m_sourceURLDirective;
     PackedRefPtr<StringImpl> m_sourceMappingURLDirective;
 
-    FixedVector<InstructionStream::Offset> m_jumpTargets;
+    FixedVector<JSInstructionStream::Offset> m_jumpTargets;
     Ref<UnlinkedMetadataTable> m_metadata;
-    std::unique_ptr<InstructionStream> m_instructions;
+    std::unique_ptr<JSInstructionStream> m_instructions;
     std::unique_ptr<BytecodeLivenessAnalysis> m_liveness;
 
 #if ENABLE(DFG_JIT)
@@ -474,7 +472,7 @@ public:
             unsigned m_endDivot;
         };
         HashMap<unsigned, TypeProfilerExpressionRange> m_typeProfilerInfoMap;
-        FixedVector<InstructionStream::Offset> m_opProfileControlFlowBytecodeOffsets;
+        FixedVector<JSInstructionStream::Offset> m_opProfileControlFlowBytecodeOffsets;
         FixedVector<BitVector> m_bitVectors;
         FixedVector<IdentifierSet> m_constantIdentifierSets;
 
@@ -482,12 +480,12 @@ public:
         unsigned m_privateBrandRequirement : 1;
     };
 
-    int outOfLineJumpOffset(InstructionStream::Offset);
-    int outOfLineJumpOffset(const InstructionStream::Ref& instruction)
+    int outOfLineJumpOffset(JSInstructionStream::Offset);
+    int outOfLineJumpOffset(const JSInstructionStream::Ref& instruction)
     {
         return outOfLineJumpOffset(instruction.offset());
     }
-    int outOfLineJumpOffset(const Instruction* pc)
+    int outOfLineJumpOffset(const JSInstruction* pc)
     {
         unsigned bytecodeOffset = this->bytecodeOffset(pc);
         return outOfLineJumpOffset(bytecodeOffset);
@@ -499,7 +497,7 @@ public:
     BaselineExecutionCounter& llintExecuteCounter() { return m_llintExecuteCounter; }
 
 private:
-    using OutOfLineJumpTargets = HashMap<InstructionStream::Offset, int>;
+    using OutOfLineJumpTargets = HashMap<JSInstructionStream::Offset, int>;
 
     OutOfLineJumpTargets m_outOfLineJumpTargets;
     std::unique_ptr<RareData> m_rareData;

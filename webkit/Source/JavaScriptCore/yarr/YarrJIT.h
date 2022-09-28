@@ -62,6 +62,7 @@ enum class JITFailureReason : uint8_t {
     FixedCountParenthesizedSubpattern,
     ParenthesisNestedTooDeep,
     ExecutableMemoryAllocationFailure,
+    OffsetTooLarge,
 };
 
 class BoyerMooreFastCandidates {
@@ -203,12 +204,12 @@ extern "C" SlowPathReturnType vmEntryToYarrJIT(const void* input, UCPURegister s
 extern "C" void vmEntryToYarrJITAfter(void);
 #endif
 
-class YarrBoyerMoyerData {
+class YarrBoyerMooreData {
     WTF_MAKE_FAST_ALLOCATED;
-    WTF_MAKE_NONCOPYABLE(YarrBoyerMoyerData);
+    WTF_MAKE_NONCOPYABLE(YarrBoyerMooreData);
 
 public:
-    YarrBoyerMoyerData() = default;
+    YarrBoyerMooreData() = default;
 
     void saveMaps(Vector<UniqueRef<BoyerMooreBitmap::Map>> maps)
     {
@@ -235,15 +236,9 @@ private:
     Vector<UniqueRef<BoyerMooreBitmap::Map>> m_maps;
 };
 
-class YarrCodeBlock : public YarrBoyerMoyerData {
+class YarrCodeBlock : public YarrBoyerMooreData {
     struct InlineStats {
-        InlineStats()
-            : m_insnCount(0)
-            , m_stackSize(0)
-            , m_needsTemp2(false)
-            , m_canInline(false)
-        {
-        }
+        InlineStats() = default;
 
         void set(unsigned insnCount, unsigned stackSize, bool canInline, bool needsTemp2)
         {
@@ -263,10 +258,10 @@ class YarrCodeBlock : public YarrBoyerMoyerData {
         bool canInline() const { return m_canInline; }
         bool needsTemp2() const { return m_needsTemp2; }
 
-        unsigned m_insnCount;
-        unsigned m_stackSize : 30;
-        bool m_needsTemp2 : 1;
-        bool m_canInline : 1;
+        unsigned m_insnCount { 0 };
+        unsigned m_stackSize : 30 { 0 };
+        bool m_needsTemp2 : 1 { false };
+        bool m_canInline : 1 { false };
     };
 
     WTF_MAKE_FAST_ALLOCATED;
@@ -332,9 +327,9 @@ public:
         ASSERT(has8BitCode());
 #if CPU(ARM64E)
         if (Options::useJITCage())
-            return MatchResult(vmEntryToYarrJIT(input, start, length, output, matchingContext, retagCodePtr<Yarr8BitPtrTag, YarrEntryPtrTag>(m_ref8.code().executableAddress())));
+            return MatchResult(vmEntryToYarrJIT(input, start, length, output, matchingContext, retagCodePtr<Yarr8BitPtrTag, YarrEntryPtrTag>(m_ref8.code().taggedPtr())));
 #endif
-        return MatchResult(untagCFunctionPtr<YarrJITCode8, Yarr8BitPtrTag>(m_ref8.code().executableAddress())(input, start, length, output, matchingContext));
+        return MatchResult(untagCFunctionPtr<YarrJITCode8, Yarr8BitPtrTag>(m_ref8.code().taggedPtr())(input, start, length, output, matchingContext));
     }
 
     MatchResult execute(const UChar* input, unsigned start, unsigned length, int* output, MatchingContextHolder* matchingContext)
@@ -342,9 +337,9 @@ public:
         ASSERT(has16BitCode());
 #if CPU(ARM64E)
         if (Options::useJITCage())
-            return MatchResult(vmEntryToYarrJIT(input, start, length, output, matchingContext, retagCodePtr<Yarr16BitPtrTag, YarrEntryPtrTag>(m_ref16.code().executableAddress())));
+            return MatchResult(vmEntryToYarrJIT(input, start, length, output, matchingContext, retagCodePtr<Yarr16BitPtrTag, YarrEntryPtrTag>(m_ref16.code().taggedPtr())));
 #endif
-        return MatchResult(untagCFunctionPtr<YarrJITCode16, Yarr16BitPtrTag>(m_ref16.code().executableAddress())(input, start, length, output, matchingContext));
+        return MatchResult(untagCFunctionPtr<YarrJITCode16, Yarr16BitPtrTag>(m_ref16.code().taggedPtr())(input, start, length, output, matchingContext));
     }
 
     MatchResult execute(const LChar* input, unsigned start, unsigned length, MatchingContextHolder* matchingContext)
@@ -352,9 +347,9 @@ public:
         ASSERT(has8BitCodeMatchOnly());
 #if CPU(ARM64E)
         if (Options::useJITCage())
-            return MatchResult(vmEntryToYarrJIT(input, start, length, nullptr, matchingContext, retagCodePtr<YarrMatchOnly8BitPtrTag, YarrEntryPtrTag>(m_matchOnly8.code().executableAddress())));
+            return MatchResult(vmEntryToYarrJIT(input, start, length, nullptr, matchingContext, retagCodePtr<YarrMatchOnly8BitPtrTag, YarrEntryPtrTag>(m_matchOnly8.code().taggedPtr())));
 #endif
-        return MatchResult(untagCFunctionPtr<YarrJITCodeMatchOnly8, YarrMatchOnly8BitPtrTag>(m_matchOnly8.code().executableAddress())(input, start, length, nullptr, matchingContext));
+        return MatchResult(untagCFunctionPtr<YarrJITCodeMatchOnly8, YarrMatchOnly8BitPtrTag>(m_matchOnly8.code().taggedPtr())(input, start, length, nullptr, matchingContext));
     }
 
     MatchResult execute(const UChar* input, unsigned start, unsigned length, MatchingContextHolder* matchingContext)
@@ -362,9 +357,9 @@ public:
         ASSERT(has16BitCodeMatchOnly());
 #if CPU(ARM64E)
         if (Options::useJITCage())
-            return MatchResult(vmEntryToYarrJIT(input, start, length, nullptr, matchingContext, retagCodePtr<YarrMatchOnly16BitPtrTag, YarrEntryPtrTag>(m_matchOnly16.code().executableAddress())));
+            return MatchResult(vmEntryToYarrJIT(input, start, length, nullptr, matchingContext, retagCodePtr<YarrMatchOnly16BitPtrTag, YarrEntryPtrTag>(m_matchOnly16.code().taggedPtr())));
 #endif
-        return MatchResult(untagCFunctionPtr<YarrJITCodeMatchOnly16, YarrMatchOnly16BitPtrTag>(m_matchOnly16.code().executableAddress())(input, start, length, nullptr, matchingContext));
+        return MatchResult(untagCFunctionPtr<YarrJITCodeMatchOnly16, YarrMatchOnly16BitPtrTag>(m_matchOnly16.code().taggedPtr())(input, start, length, nullptr, matchingContext));
     }
 
 #if ENABLE(REGEXP_TRACING)
@@ -373,7 +368,7 @@ public:
         if (!has8BitCodeMatchOnly())
             return 0;
 
-        return m_matchOnly8.code().executableAddress();
+        return m_matchOnly8.code().taggedPtr();
     }
 
     void *get16BitMatchOnlyAddr()
@@ -381,7 +376,7 @@ public:
         if (!has16BitCodeMatchOnly())
             return 0;
 
-        return m_matchOnly16.code().executableAddress();
+        return m_matchOnly16.code().taggedPtr();
     }
 
     void *get8BitMatchAddr()
@@ -389,7 +384,7 @@ public:
         if (!has8BitCode())
             return 0;
 
-        return m_ref8.code().executableAddress();
+        return m_ref8.code().taggedPtr();
     }
 
     void *get16BitMatchAddr()
@@ -397,7 +392,7 @@ public:
         if (!has16BitCode())
             return 0;
 
-        return m_ref16.code().executableAddress();
+        return m_ref16.code().taggedPtr();
     }
 #endif
 
@@ -433,14 +428,14 @@ enum class JITCompileMode : uint8_t {
     IncludeSubpatterns,
     InlineTest
 };
-void jitCompile(YarrPattern&, String& patternString, CharSize, VM*, YarrCodeBlock& jitObject, JITCompileMode);
+void jitCompile(YarrPattern&, StringView patternString, CharSize, VM*, YarrCodeBlock& jitObject, JITCompileMode);
 
 #if ENABLE(YARR_JIT_REGEXP_TEST_INLINE)
 
 
 class YarrJITRegisters;
 
-void jitCompileInlinedTest(StackCheck*, const String&, OptionSet<Yarr::Flags>, CharSize, const VM*, YarrBoyerMoyerData&, CCallHelpers&, YarrJITRegisters&);
+void jitCompileInlinedTest(StackCheck*, StringView, OptionSet<Yarr::Flags>, CharSize, const VM*, YarrBoyerMooreData&, CCallHelpers&, YarrJITRegisters&);
 #endif
 
 } } // namespace JSC::Yarr

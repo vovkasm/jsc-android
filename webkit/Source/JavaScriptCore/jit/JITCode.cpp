@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2018 Apple Inc. All rights reserved.
+ * Copyright (C) 2008-2022 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,6 +26,7 @@
 #include "config.h"
 #include "JITCode.h"
 
+#include "DFGJITCode.h"
 #include "FTLJITCode.h"
 
 #include <wtf/PrintStream.h>
@@ -40,29 +41,51 @@ JITCode::JITCode(JITType jitType, ShareAttribute shareAttribute)
 {
 }
 
-JITCode::~JITCode()
-{
-}
+JITCode::~JITCode() = default;
 
-const char* JITCode::typeName(JITType jitType)
+ASCIILiteral JITCode::typeName(JITType jitType)
 {
     switch (jitType) {
     case JITType::None:
-        return "None";
+        return "None"_s;
     case JITType::HostCallThunk:
-        return "Host";
+        return "Host"_s;
     case JITType::InterpreterThunk:
-        return "LLInt";
+        return "LLInt"_s;
     case JITType::BaselineJIT:
-        return "Baseline";
+        return "Baseline"_s;
     case JITType::DFGJIT:
-        return "DFG";
+        return "DFG"_s;
     case JITType::FTLJIT:
-        return "FTL";
+        return "FTL"_s;
     default:
         CRASH();
-        return "";
+        return ""_s;
     }
+}
+
+bool JITCode::isUnlinked() const
+{
+    switch (m_jitType) {
+    case JITType::None:
+    case JITType::HostCallThunk:
+    case JITType::InterpreterThunk:
+    case JITType::BaselineJIT:
+        return true;
+    case JITType::DFGJIT:
+#if ENABLE(DFG_JIT)
+        return static_cast<const DFG::JITCode*>(this)->isUnlinked();
+#else
+        return false;
+#endif
+    case JITType::FTLJIT:
+#if ENABLE(FTL_JIT)
+        return static_cast<const FTL::JITCode*>(this)->isUnlinked();
+#else
+        return false;
+#endif
+    }
+    return true;
 }
 
 void JITCode::validateReferences(const TrackedReferences&)
@@ -114,6 +137,11 @@ const RegisterAtOffsetList* JITCode::calleeSaveRegisters() const
 #endif
 }
 
+JITCode::CodeRef<JSEntryPtrTag> JITCode::swapCodeRefForDebugger(JITCode::CodeRef<JSEntryPtrTag>)
+{
+    return CodeRef<JSEntryPtrTag>();
+}
+
 JITCodeWithCodeRef::JITCodeWithCodeRef(JITType jitType)
     : JITCode(jitType)
 {
@@ -135,11 +163,11 @@ JITCodeWithCodeRef::~JITCodeWithCodeRef()
 void* JITCodeWithCodeRef::executableAddressAtOffset(size_t offset)
 {
     RELEASE_ASSERT(m_ref);
-    assertIsTaggedWith<JSEntryPtrTag>(m_ref.code().executableAddress());
+    assertIsTaggedWith<JSEntryPtrTag>(m_ref.code().taggedPtr());
     if (!offset)
-        return m_ref.code().executableAddress();
+        return m_ref.code().taggedPtr();
 
-    char* executableAddress = untagCodePtr<char*, JSEntryPtrTag>(m_ref.code().executableAddress());
+    char* executableAddress = untagCodePtr<char*, JSEntryPtrTag>(m_ref.code().taggedPtr());
     return tagCodePtr<JSEntryPtrTag>(executableAddress + offset);
 }
 
@@ -153,7 +181,7 @@ void* JITCodeWithCodeRef::dataAddressAtOffset(size_t offset)
 unsigned JITCodeWithCodeRef::offsetOf(void* pointerIntoCode)
 {
     RELEASE_ASSERT(m_ref);
-    intptr_t result = reinterpret_cast<intptr_t>(pointerIntoCode) - m_ref.code().executableAddress<intptr_t>();
+    intptr_t result = reinterpret_cast<intptr_t>(pointerIntoCode) - m_ref.code().taggedPtr<intptr_t>();
     ASSERT(static_cast<intptr_t>(static_cast<unsigned>(result)) == result);
     return static_cast<unsigned>(result);
 }
@@ -170,12 +198,21 @@ bool JITCodeWithCodeRef::contains(void* address)
     return m_ref.executableMemory()->contains(address);
 }
 
+JITCode::CodeRef<JSEntryPtrTag> JITCodeWithCodeRef::swapCodeRefForDebugger(JITCode::CodeRef<JSEntryPtrTag> ref)
+{
+    RELEASE_ASSERT(m_ref);
+    RELEASE_ASSERT(ref);
+    auto old = m_ref;
+    m_ref = ref;
+    return old;
+}
+
 DirectJITCode::DirectJITCode(JITType jitType)
     : JITCodeWithCodeRef(jitType)
 {
 }
 
-DirectJITCode::DirectJITCode(JITCode::CodeRef<JSEntryPtrTag> ref, JITCode::CodePtr<JSEntryPtrTag> withArityCheck, JITType jitType, JITCode::ShareAttribute shareAttribute)
+DirectJITCode::DirectJITCode(JITCode::CodeRef<JSEntryPtrTag> ref, CodePtr<JSEntryPtrTag> withArityCheck, JITType jitType, JITCode::ShareAttribute shareAttribute)
     : JITCodeWithCodeRef(ref, jitType, shareAttribute)
     , m_withArityCheck(withArityCheck)
 {
@@ -183,7 +220,7 @@ DirectJITCode::DirectJITCode(JITCode::CodeRef<JSEntryPtrTag> ref, JITCode::CodeP
     ASSERT(m_withArityCheck);
 }
 
-DirectJITCode::DirectJITCode(JITCode::CodeRef<JSEntryPtrTag> ref, JITCode::CodePtr<JSEntryPtrTag> withArityCheck, JITType jitType, Intrinsic intrinsic, JITCode::ShareAttribute shareAttribute)
+DirectJITCode::DirectJITCode(JITCode::CodeRef<JSEntryPtrTag> ref, CodePtr<JSEntryPtrTag> withArityCheck, JITType jitType, Intrinsic intrinsic, JITCode::ShareAttribute shareAttribute)
     : JITCodeWithCodeRef(ref, jitType, shareAttribute)
     , m_withArityCheck(withArityCheck)
 {
@@ -192,11 +229,9 @@ DirectJITCode::DirectJITCode(JITCode::CodeRef<JSEntryPtrTag> ref, JITCode::CodeP
     ASSERT(m_withArityCheck);
 }
 
-DirectJITCode::~DirectJITCode()
-{
-}
+DirectJITCode::~DirectJITCode() = default;
 
-void DirectJITCode::initializeCodeRefForDFG(JITCode::CodeRef<JSEntryPtrTag> ref, JITCode::CodePtr<JSEntryPtrTag> withArityCheck)
+void DirectJITCode::initializeCodeRefForDFG(JITCode::CodeRef<JSEntryPtrTag> ref, CodePtr<JSEntryPtrTag> withArityCheck)
 {
     RELEASE_ASSERT(!m_ref);
     m_ref = ref;
@@ -205,7 +240,7 @@ void DirectJITCode::initializeCodeRefForDFG(JITCode::CodeRef<JSEntryPtrTag> ref,
     ASSERT(m_withArityCheck);
 }
 
-JITCode::CodePtr<JSEntryPtrTag> DirectJITCode::addressForCall(ArityCheckMode arity)
+CodePtr<JSEntryPtrTag> DirectJITCode::addressForCall(ArityCheckMode arity)
 {
     switch (arity) {
     case ArityCheckNotRequired:
@@ -230,11 +265,9 @@ NativeJITCode::NativeJITCode(CodeRef<JSEntryPtrTag> ref, JITType jitType, Intrin
     m_intrinsic = intrinsic;
 }
 
-NativeJITCode::~NativeJITCode()
-{
-}
+NativeJITCode::~NativeJITCode() = default;
 
-JITCode::CodePtr<JSEntryPtrTag> NativeJITCode::addressForCall(ArityCheckMode arity)
+CodePtr<JSEntryPtrTag> NativeJITCode::addressForCall(ArityCheckMode arity)
 {
     RELEASE_ASSERT(m_ref);
     switch (arity) {

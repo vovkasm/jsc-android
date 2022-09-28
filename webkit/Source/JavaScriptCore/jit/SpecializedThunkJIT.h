@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2021 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2022 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -153,23 +153,23 @@ namespace JSC {
             ret();
         }
         
-        MacroAssemblerCodeRef<JITThunkPtrTag> finalize(MacroAssemblerCodePtr<JITThunkPtrTag> fallback, const char* thunkKind)
+        MacroAssemblerCodeRef<JITThunkPtrTag> finalize(CodePtr<JITThunkPtrTag> fallback, const char* thunkKind)
         {
             LinkBuffer patchBuffer(*this, GLOBAL_THUNK_ID, LinkBuffer::Profile::SpecializedThunk);
             patchBuffer.link(m_failures, CodeLocationLabel<JITThunkPtrTag>(fallback));
             for (unsigned i = 0; i < m_calls.size(); i++)
                 patchBuffer.link(m_calls[i].first, m_calls[i].second);
-            return FINALIZE_CODE(patchBuffer, JITThunkPtrTag, "Specialized thunk for %s", thunkKind);
+            return FINALIZE_THUNK(patchBuffer, JITThunkPtrTag, "Specialized thunk for %s", thunkKind);
         }
 
         // Assumes that the target function uses fpRegister0 as the first argument
         // and return value. Like any sensible architecture would.
-        void callDoubleToDouble(FunctionPtr<CFunctionPtrTag> function)
+        void callDoubleToDouble(CodePtr<CFunctionPtrTag> function)
         {
             m_calls.append(std::make_pair(call(OperationPtrTag), function.retagged<OperationPtrTag>()));
         }
         
-        void callDoubleToDoublePreservingReturn(FunctionPtr<CFunctionPtrTag> function)
+        void callDoubleToDoublePreservingReturn(CodePtr<CFunctionPtrTag> function)
         {
             if (!isX86())
                 preserveReturnAddressAfterCall(regT3);
@@ -196,7 +196,7 @@ namespace JSC {
         }
         
         MacroAssembler::JumpList m_failures;
-        Vector<std::pair<Call, FunctionPtr<OperationPtrTag>>> m_calls;
+        Vector<std::pair<Call, CodePtr<OperationPtrTag>>> m_calls;
     };
 
 }

@@ -83,6 +83,7 @@ int main(int argc, char** argv) {
     defined(__ARMEL__) || defined(__avr32__) || defined(_M_ARM) || defined(_M_ARM64) || \
     defined(__hppa__) || defined(__ia64__) || \
     defined(__mips__) || \
+    defined(__loongarch__) || \
     defined(__powerpc__) || defined(__ppc__) || defined(__ppc64__) || \
     defined(_POWER) || defined(_ARCH_PPC) || defined(_ARCH_PPC64) || \
     defined(__sparc__) || defined(__sparc) || defined(__s390__) || \
@@ -192,7 +193,7 @@ inline int StrLength(const char* string) {
 template <typename T>
 class BufferReference {
  public:
-  BufferReference() : start_(nullptr), length_(0) {}
+  BufferReference() = default;
   BufferReference(T* data, int len) : start_(data), length_(len) {
     ASSERT(len == 0 || (len > 0 && data != NULL));
   }
@@ -226,8 +227,8 @@ class BufferReference {
   T& last() { return start_[length_ - 1]; }
 
  private:
-  T* start_;
-  int length_;
+  T* start_ { nullptr };
+  int length_ { 0 };
 };
 
 
@@ -237,7 +238,7 @@ class BufferReference {
 class StringBuilder {
  public:
   StringBuilder(char* buffer, int buffer_size)
-      : buffer_(buffer, buffer_size), position_(0) { }
+      : buffer_(buffer, buffer_size) { }
 
   ~StringBuilder() { if (!is_finalized()) Finalize(); }
 
@@ -308,7 +309,7 @@ class StringBuilder {
 
  private:
   BufferReference<char> buffer_;
-  int position_;
+  int position_ { 0 };
 
   bool is_finalized() const { return position_ < 0; }
 

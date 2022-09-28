@@ -34,11 +34,7 @@
 
 namespace JSC {
 
-TypeSet::TypeSet()
-    : m_isOverflown(false)
-    , m_seenTypes(TypeNothing)
-{
-}
+TypeSet::TypeSet() = default;
 
 void TypeSet::addTypeInformation(RuntimeType type, RefPtr<StructureShape>&& passedNewShape, Structure* structure, bool sawPolyProtoStructure)
 {
@@ -316,13 +312,7 @@ String TypeSet::toJSONString() const
     return json.toString();
 }
 
-StructureShape::StructureShape()
-    : m_final(false)
-    , m_isInDictionaryMode(false)
-    , m_proto(nullptr)
-    , m_propertyHash(nullptr)
-{
-}
+StructureShape::StructureShape() = default;
 
 void StructureShape::markAsFinal()
 {
@@ -347,8 +337,8 @@ String StructureShape::propertyHash()
     builder.append(m_constructorName);
     builder.append(':');
     for (auto& key : m_fields) {
-        String property = key.get();
-        property.replace(":", "\\:"); // Ensure that hash({"foo:", "bar"}) != hash({"foo", ":bar"}) because we're using colons as a separator and colons are legal characters in field names in JS.
+        // Ensure that hash({"foo:", "bar"}) != hash({"foo", ":bar"}) because we're using colons as a separator and colons are legal characters in field names in JS.
+        String property = makeStringByReplacingAll(key.get(), ':', "\\:"_s);
         builder.append(property);
     }
 
@@ -386,7 +376,7 @@ String StructureShape::leastCommonAncestor(const Vector<Ref<StructureShape>>& sh
             }
         }
 
-        if (origin->m_constructorName == "Object")
+        if (origin->m_constructorName == "Object"_s)
             break;
     }
 

@@ -43,8 +43,6 @@ class CharacterClassConstructor {
 public:
     CharacterClassConstructor(bool isCaseInsensitive, CanonicalMode canonicalMode)
         : m_isCaseInsensitive(isCaseInsensitive)
-        , m_anyCharacter(false)
-        , m_characterWidths(CharacterClassWidths::Unknown)
         , m_canonicalMode(canonicalMode)
     {
     }
@@ -421,9 +419,9 @@ private:
     }
 
     bool m_isCaseInsensitive : 1;
-    bool m_anyCharacter : 1;
-    CharacterClassWidths m_characterWidths;
-    
+    bool m_anyCharacter : 1 { false };
+    CharacterClassWidths m_characterWidths { CharacterClassWidths::Unknown };
+
     CanonicalMode m_canonicalMode;
 
     Vector<UChar32> m_matches;
@@ -444,9 +442,7 @@ public:
         m_pattern.m_disjunctions.append(WTFMove(body));
     }
 
-    ~YarrPatternConstructor()
-    {
-    }
+    ~YarrPatternConstructor() = default;
 
     void resetForReparsing()
     {
@@ -1108,7 +1104,7 @@ private:
     bool m_invertParentheticalAssertion { false };
 };
 
-ErrorCode YarrPattern::compile(const String& patternString)
+ErrorCode YarrPattern::compile(StringView patternString)
 {
     YarrPatternConstructor constructor(*this);
 
@@ -1137,13 +1133,8 @@ ErrorCode YarrPattern::compile(const String& patternString)
     return ErrorCode::NoError;
 }
 
-YarrPattern::YarrPattern(const String& pattern, OptionSet<Flags> flags, ErrorCode& error)
-    : m_containsBackreferences(false)
-    , m_containsBOL(false)
-    , m_containsUnsignedLengthPattern(false)
-    , m_hasCopiedParenSubexpressions(false)
-    , m_saveInitialStartValue(false)
-    , m_flags(flags)
+YarrPattern::YarrPattern(StringView pattern, OptionSet<Flags> flags, ErrorCode& error)
+    : m_flags(flags)
 {
     ASSERT(m_flags != Flags::DeletedValue);
     error = compile(pattern);
@@ -1381,7 +1372,7 @@ void PatternDisjunction::dump(PrintStream& out, YarrPattern* thisPattern, unsign
     }
 }
 
-void YarrPattern::dumpPatternString(PrintStream& out, const String& patternString)
+void YarrPattern::dumpPatternString(PrintStream& out, StringView patternString)
 {
     out.print("/", patternString, "/");
 
@@ -1397,12 +1388,12 @@ void YarrPattern::dumpPatternString(PrintStream& out, const String& patternStrin
         out.print("y");
 }
 
-void YarrPattern::dumpPattern(const String& patternString)
+void YarrPattern::dumpPattern(StringView patternString)
 {
     dumpPattern(WTF::dataFile(), patternString);
 }
 
-void YarrPattern::dumpPattern(PrintStream& out, const String& patternString)
+void YarrPattern::dumpPattern(PrintStream& out, StringView patternString)
 {
     out.print("RegExp pattern for ");
     dumpPatternString(out, patternString);

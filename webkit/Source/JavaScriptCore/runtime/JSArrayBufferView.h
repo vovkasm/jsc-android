@@ -161,12 +161,12 @@ protected:
         Butterfly* butterfly() const { return m_butterfly; }
         
     private:
-        Structure* m_structure;
+        Structure* m_structure { nullptr };
         using VectorType = CagedPtr<Gigacage::Primitive, void, tagCagedPtr>;
         VectorType m_vector;
         size_t m_length;
         TypedArrayMode m_mode;
-        Butterfly* m_butterfly;
+        Butterfly* m_butterfly { nullptr };
     };
     
     JS_EXPORT_PRIVATE JSArrayBufferView(VM&, ConstructionContext&);
@@ -196,7 +196,7 @@ public:
     inline std::optional<size_t> byteOffsetConcurrently();
 
     size_t length() const { return m_length; }
-    size_t byteLength() const;
+    JS_EXPORT_PRIVATE size_t byteLength() const;
 
     DECLARE_EXPORT_INFO;
     
@@ -206,6 +206,8 @@ public:
     
     static RefPtr<ArrayBufferView> toWrapped(VM&, JSValue);
     static RefPtr<ArrayBufferView> toWrappedAllowShared(VM&, JSValue);
+
+    bool isIteratorProtocolFastAndNonObservable();
 
 private:
     enum Requester { Mutator, ConcurrentThread };

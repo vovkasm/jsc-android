@@ -253,11 +253,7 @@ public:
 
     class iterator {
     public:
-        iterator()
-            : m_code(nullptr)
-            , m_index(0)
-        {
-        }
+        iterator() = default;
 
         iterator(const Code& code, unsigned index)
             : m_code(&code)
@@ -287,8 +283,8 @@ public:
         }
 
     private:
-        const Code* m_code;
-        unsigned m_index;
+        const Code* m_code { nullptr };
+        unsigned m_index { 0 };
     };
 
     iterator begin() const { return iterator(*this, 0); }
@@ -355,8 +351,6 @@ public:
     RegisterSet mutableFPRs();
     RegisterSet pinnedRegisters() const { return m_pinnedRegs; }
     
-    WeakRandom& weakRandom() { return m_weakRandom; }
-
     void emitDefaultPrologue(CCallHelpers&);
     void emitEpilogue(CCallHelpers&);
 
@@ -384,7 +378,6 @@ private:
         ASSERT_NOT_REACHED();
     }
 
-    WeakRandom m_weakRandom;
     Procedure& m_proc; // Some meta-data, like byproducts, is stored in the Procedure.
     Vector<Reg> m_gpRegsInPriorityOrder;
     Vector<Reg> m_fpRegsInPriorityOrder;
@@ -411,7 +404,7 @@ private:
     Vector<MacroAssembler::Label> m_entrypointLabels; // This is empty until code generation.
     Vector<Ref<PrologueGenerator>, 1> m_prologueGenerators;
     RefPtr<WasmBoundsCheckGenerator> m_wasmBoundsCheckGenerator;
-    const char* m_lastPhaseName;
+    const char* m_lastPhaseName { "initial" };
     std::unique_ptr<Disassembler> m_disassembler;
     Ref<PrologueGenerator> m_defaultPrologueGenerator;
 };

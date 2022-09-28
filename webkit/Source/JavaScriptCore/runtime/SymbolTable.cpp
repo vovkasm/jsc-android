@@ -37,7 +37,7 @@
 
 namespace JSC {
 
-const ClassInfo SymbolTable::s_info = { "SymbolTable", nullptr, nullptr, nullptr, CREATE_METHOD_TABLE(SymbolTable) };
+const ClassInfo SymbolTable::s_info = { "SymbolTable"_s, nullptr, nullptr, nullptr, CREATE_METHOD_TABLE(SymbolTable) };
 
 DEFINE_ALLOCATOR_WITH_HEAP_IDENTIFIER(SymbolTableEntryFatEntry);
 
@@ -81,13 +81,10 @@ SymbolTableEntry::FatEntry* SymbolTableEntry::inflateSlow()
 
 SymbolTable::SymbolTable(VM& vm)
     : JSCell(vm, vm.symbolTableStructure.get())
-    , m_usesNonStrictEval(false)
-    , m_nestedLexicalScope(false)
-    , m_scopeType(VarScope)
 {
 }
 
-SymbolTable::~SymbolTable() { }
+SymbolTable::~SymbolTable() = default;
 
 void SymbolTable::finishCreation(VM& vm)
 {

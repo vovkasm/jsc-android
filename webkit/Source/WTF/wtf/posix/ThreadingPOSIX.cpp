@@ -78,9 +78,7 @@
 
 namespace WTF {
 
-Thread::~Thread()
-{
-}
+Thread::~Thread() = default;
 
 #if !OS(DARWIN)
 class Semaphore final {
@@ -556,6 +554,10 @@ void Thread::destructTLS(void* data)
     _pthread_setspecific_direct(WTF_THREAD_DATA_KEY, thread);
     pthread_key_init_np(WTF_THREAD_DATA_KEY, &destructTLS);
 #endif
+    // Destructor of ClientData can rely on Thread::current() (e.g. AtomStringTable).
+    // We destroy it after re-setting Thread::current() so that we can ensure destruction
+    // can still access to it.
+    thread->m_clientData = nullptr;
 }
 
 Mutex::~Mutex()
@@ -605,15 +607,15 @@ bool ThreadCondition::timedWait(Mutex& mutex, WallTime absoluteTime)
     if (absoluteTime < WallTime::now())
         return false;
 
-    if (absoluteTime > WallTime::fromRawSeconds(INT_MAX)) {
+    if (absoluteTime > WallTime::fromRawSeconds(static_cast<double>(std::numeric_limits<time_t>::max()))) {
         wait(mutex);
         return true;
     }
 
     double rawSeconds = absoluteTime.secondsSinceEpoch().value();
 
-    int timeSeconds = static_cast<int>(rawSeconds);
-    int timeNanoseconds = static_cast<int>((rawSeconds - timeSeconds) * 1E9);
+    time_t timeSeconds = static_cast<time_t>(rawSeconds);
+    long timeNanoseconds = static_cast<long>((rawSeconds - timeSeconds) * 1E9);
 
     timespec targetTime;
     targetTime.tv_sec = timeSeconds;

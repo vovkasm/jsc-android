@@ -87,6 +87,20 @@ macro(WEBKIT_ADD_TARGET_CXX_FLAGS _target)
 endmacro()
 
 
+option(DEVELOPER_MODE_FATAL_WARNINGS "Build with warnings as errors if DEVELOPER_MODE is also enabled" OFF)
+if (DEVELOPER_MODE AND DEVELOPER_MODE_FATAL_WARNINGS)
+    if (MSVC)
+        set(FATAL_WARNINGS_FLAG /WX)
+    else ()
+        set(FATAL_WARNINGS_FLAG -Werror)
+    endif ()
+
+    check_cxx_compiler_flag(${FATAL_WARNINGS_FLAG} CXX_COMPILER_SUPPORTS_WERROR)
+    if (CXX_COMPILER_SUPPORTS_WERROR)
+        set(DEVELOPER_MODE_CXX_FLAGS ${FATAL_WARNINGS_FLAG})
+    endif ()
+endif ()
+
 if (COMPILER_IS_GCC_OR_CLANG)
     WEBKIT_APPEND_GLOBAL_COMPILER_FLAGS(-fno-strict-aliasing)
 
@@ -131,35 +145,31 @@ if (COMPILER_IS_GCC_OR_CLANG)
 
     WEBKIT_PREPEND_GLOBAL_CXX_FLAGS(-Wno-noexcept-type)
 
-    # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80947
-    if (${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS "8.0" AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-        WEBKIT_PREPEND_GLOBAL_CXX_FLAGS(-Wno-attributes)
-    endif ()
+    # These GCC warnings produce too many false positives to be useful. We'll
+    # rely on developers who build with Clang to notice these warnings.
+    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        # https://bugs.webkit.org/show_bug.cgi?id=167643#c13
+        WEBKIT_PREPEND_GLOBAL_COMPILER_FLAGS(-Wno-expansion-to-defined)
 
-    # Since GCC 11, these warnings produce too many false positives to be useful. We'll rely on
-    # developers who build with Clang to notice these warnings.
-    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND ${CMAKE_CXX_COMPILER_VERSION} VERSION_GREATER_EQUAL "11.0")
+        # https://bugs.webkit.org/show_bug.cgi?id=228601
         WEBKIT_PREPEND_GLOBAL_CXX_FLAGS(-Wno-array-bounds)
         WEBKIT_PREPEND_GLOBAL_CXX_FLAGS(-Wno-nonnull)
-    endif ()
 
-    # This triggers warnings in wtf/Packed.h, a header that is included in many places. It does not
-    # respect ignore warning pragmas and we cannot easily suppress it for all affected files.
-    # https://bugs.webkit.org/show_bug.cgi?id=226557
-    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND ${CMAKE_CXX_COMPILER_VERSION} VERSION_GREATER_EQUAL "11.0")
+        # https://bugs.webkit.org/show_bug.cgi?id=240596
+        WEBKIT_PREPEND_GLOBAL_CXX_FLAGS(-Wno-stringop-overflow)
+
+        # This triggers warnings in wtf/Packed.h, a header that is included in many places. It does not
+        # respect ignore warning pragmas and we cannot easily suppress it for all affected files.
+        # https://bugs.webkit.org/show_bug.cgi?id=226557
         WEBKIT_PREPEND_GLOBAL_CXX_FLAGS(-Wno-stringop-overread)
-    endif ()
 
-    # -Wodr trips over our bindings integrity feature when LTO is enabled.
-    # https://bugs.webkit.org/show_bug.cgi?id=229867
-    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        # -Wodr trips over our bindings integrity feature when LTO is enabled.
+        # https://bugs.webkit.org/show_bug.cgi?id=229867
         WEBKIT_PREPEND_GLOBAL_CXX_FLAGS(-Wno-odr)
-    endif ()
 
-    # -Wexpansion-to-defined produces false positives with GCC but not Clang
-    # https://bugs.webkit.org/show_bug.cgi?id=167643#c13
-    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-        WEBKIT_PREPEND_GLOBAL_COMPILER_FLAGS(-Wno-expansion-to-defined)
+        # Match Clang's behavor and exit after emitting 20 errors.
+        # https://bugs.webkit.org/show_bug.cgi?id=244621
+        WEBKIT_PREPEND_GLOBAL_COMPILER_FLAGS(-fmax-errors=20)
     endif ()
 
     # Force SSE2 fp on x86 builds.
@@ -278,7 +288,7 @@ endif ()
 macro(DETERMINE_GCC_SYSTEM_INCLUDE_DIRS _lang _compiler _flags _result)
     file(WRITE "${CMAKE_BINARY_DIR}/CMakeFiles/dummy" "\n")
     separate_arguments(_buildFlags UNIX_COMMAND "${_flags}")
-    execute_process(COMMAND ${_compiler} ${_buildFlags} -v -E -x ${_lang} -dD dummy
+    execute_process(COMMAND ${CMAKE_COMMAND} -E env LANG=C ${_compiler} ${_buildFlags} -v -E -x ${_lang} -dD dummy
                     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/CMakeFiles OUTPUT_QUIET
                     ERROR_VARIABLE _gccOutput)
     file(REMOVE "${CMAKE_BINARY_DIR}/CMakeFiles/dummy")
@@ -416,4 +426,16 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND WTF_CPU_MIPS)
     # processor. This is a workaround and does not cover all cases
     # (see comment #28 in the link above).
     WEBKIT_PREPEND_GLOBAL_COMPILER_FLAGS(-mno-lxc1-sxc1)
+endif ()
+
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    set(CMAKE_REQUIRED_FLAGS "--std=c++2a")
+    set(REMOVE_CVREF_TEST_SOURCE "
+        #include <type_traits>
+        int main() {
+            using type = std::remove_cvref_t<int&>;
+        }
+    ")
+    check_cxx_source_compiles("${REMOVE_CVREF_TEST_SOURCE}" STD_REMOVE_CVREF_IS_AVAILABLE)
+    unset(CMAKE_REQUIRED_FLAGS)
 endif ()

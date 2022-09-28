@@ -30,12 +30,16 @@
 #include "DFGArithMode.h"
 #include "JITOperations.h"
 #include "TypedArrayType.h"
+#include <wtf/text/StringSearch.h>
 
 namespace JSC {
 
 class DateInstance;
 class JSBigInt;
 class JSPropertyNameEnumerator;
+class JSRopeString;
+class JSWeakMap;
+class JSWeakSet;
 class OptimizingCallLinkInfo;
 struct UnlinkedStringJumpTable;
 
@@ -100,7 +104,6 @@ JSC_DECLARE_JIT_OPERATION(operationToPropertyKey, EncodedJSValue, (JSGlobalObjec
 JSC_DECLARE_JIT_OPERATION(operationToNumber, EncodedJSValue, (JSGlobalObject*, EncodedJSValue));
 JSC_DECLARE_JIT_OPERATION(operationToNumeric, EncodedJSValue, (JSGlobalObject*, EncodedJSValue));
 JSC_DECLARE_JIT_OPERATION(operationCallNumberConstructor, EncodedJSValue, (JSGlobalObject*, EncodedJSValue));
-JSC_DECLARE_JIT_OPERATION(operationGetByValWithThis, EncodedJSValue, (JSGlobalObject*, EncodedJSValue, EncodedJSValue, EncodedJSValue));
 JSC_DECLARE_JIT_OPERATION(operationGetPrototypeOf, EncodedJSValue, (JSGlobalObject*, EncodedJSValue));
 JSC_DECLARE_JIT_OPERATION(operationGetPrototypeOfObject, EncodedJSValue, (JSGlobalObject*, JSObject*));
 JSC_DECLARE_JIT_OPERATION(operationHasIndexedProperty, size_t, (JSGlobalObject*, JSCell*, int32_t));
@@ -217,8 +220,8 @@ JSC_DECLARE_JIT_OPERATION(operationCreateRest, JSCell*, (JSGlobalObject*, Regist
 JSC_DECLARE_JIT_OPERATION(operationNewArrayBuffer, JSCell*, (VM*, Structure*, JSCell*));
 JSC_DECLARE_JIT_OPERATION(operationSetAdd, JSCell*, (JSGlobalObject*, JSCell*, EncodedJSValue, int32_t));
 JSC_DECLARE_JIT_OPERATION(operationMapSet, JSCell*, (JSGlobalObject*, JSCell*, EncodedJSValue, EncodedJSValue, int32_t));
-JSC_DECLARE_JIT_OPERATION(operationWeakSetAdd, void, (VM*, JSCell*, JSCell*, int32_t));
-JSC_DECLARE_JIT_OPERATION(operationWeakMapSet, void, (VM*, JSCell*, JSCell*, EncodedJSValue, int32_t));
+JSC_DECLARE_JIT_OPERATION(operationWeakSetAdd, void, (JSGlobalObject*, JSCell*, JSCell*, int32_t));
+JSC_DECLARE_JIT_OPERATION(operationWeakMapSet, void, (JSGlobalObject*, JSCell*, JSCell*, EncodedJSValue, int32_t));
 JSC_DECLARE_JIT_OPERATION(operationFModOnInts, double, (int32_t, int32_t));
 JSC_DECLARE_JIT_OPERATION(operationTypeOfIsObject, size_t, (JSGlobalObject*, JSCell*));
 JSC_DECLARE_JIT_OPERATION(operationTypeOfIsFunction, size_t, (JSGlobalObject*, JSCell*));
@@ -234,11 +237,18 @@ JSC_DECLARE_JIT_OPERATION(operationEnsureDouble, char*, (VM*, JSCell*));
 JSC_DECLARE_JIT_OPERATION(operationEnsureContiguous, char*, (VM*, JSCell*));
 JSC_DECLARE_JIT_OPERATION(operationEnsureArrayStorage, char*, (VM*, JSCell*));
 JSC_DECLARE_JIT_OPERATION(operationResolveRope, StringImpl*, (JSGlobalObject*, JSString*));
+JSC_DECLARE_JIT_OPERATION(operationResolveRopeString, JSString*, (JSGlobalObject*, JSRopeString*));
 JSC_DECLARE_JIT_OPERATION(operationSingleCharacterString, JSString*, (VM*, int32_t));
 
 JSC_DECLARE_JIT_OPERATION(operationStringSubstr, JSCell*, (JSGlobalObject*, JSCell*, int32_t, int32_t));
 JSC_DECLARE_JIT_OPERATION(operationStringSlice, JSCell*, (JSGlobalObject*, JSCell*, int32_t, int32_t));
 JSC_DECLARE_JIT_OPERATION(operationStringValueOf, JSString*, (JSGlobalObject*, EncodedJSValue));
+JSC_DECLARE_JIT_OPERATION(operationStringReplaceStringString, JSString*, (JSGlobalObject*, JSString*, JSString*, JSString*));
+JSC_DECLARE_JIT_OPERATION(operationStringReplaceStringStringWithoutSubstitution, JSString*, (JSGlobalObject*, JSString*, JSString*, JSString*));
+JSC_DECLARE_JIT_OPERATION(operationStringReplaceStringEmptyString, JSString*, (JSGlobalObject*, JSString*, JSString*));
+JSC_DECLARE_JIT_OPERATION(operationStringReplaceStringStringWithTable8, JSString*, (JSGlobalObject*, JSString*, JSString*, JSString*, const BoyerMooreHorspoolTable<uint8_t>*));
+JSC_DECLARE_JIT_OPERATION(operationStringReplaceStringStringWithoutSubstitutionWithTable8, JSString*, (JSGlobalObject*, JSString*, JSString*, JSString*, const BoyerMooreHorspoolTable<uint8_t>*));
+JSC_DECLARE_JIT_OPERATION(operationStringReplaceStringEmptyStringWithTable8, JSString*, (JSGlobalObject*, JSString*, JSString*, const BoyerMooreHorspoolTable<uint8_t>*));
 JSC_DECLARE_JIT_OPERATION(operationToLowerCase, JSString*, (JSGlobalObject*, JSString*, uint32_t));
 
 JSC_DECLARE_JIT_OPERATION(operationInt32ToString, char*, (JSGlobalObject*, int32_t, int32_t));

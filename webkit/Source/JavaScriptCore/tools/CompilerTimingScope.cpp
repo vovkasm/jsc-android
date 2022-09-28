@@ -40,14 +40,14 @@ class CompilerTimingScopeState {
     WTF_MAKE_NONCOPYABLE(CompilerTimingScopeState);
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    CompilerTimingScopeState() { }
-    
+    CompilerTimingScopeState() = default;
+
     Seconds addToTotal(const char* compilerName, const char* name, Seconds duration)
     {
         Locker locker { lock };
 
         for (auto& tuple : totals) {
-            if (String(std::get<0>(tuple)) == String(compilerName) && String(std::get<1>(tuple)) == String(name)) {
+            if (!strcmp(std::get<0>(tuple), compilerName) && !strcmp(std::get<1>(tuple), name)) {
                 std::get<2>(tuple) += duration;
                 std::get<3>(tuple) = std::max(std::get<3>(tuple), duration);
                 return std::get<2>(tuple);

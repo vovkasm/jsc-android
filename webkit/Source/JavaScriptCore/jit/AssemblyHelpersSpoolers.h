@@ -94,6 +94,9 @@ public:
     void execute(const RegisterAtOffset& entry)
     {
         RELEASE_ASSERT(RegDispatch<RegType>::hasSameType(entry.reg()));
+        auto& jit = m_jit;
+        JIT_COMMENT(jit, "Execute Spooler: ", entry);
+
         if constexpr (!hasPairOp)
             return op().executeSingle(entry.offset(), RegDispatch<RegType>::get(entry.reg()));
 
@@ -136,11 +139,7 @@ public:
     }
 
 private:
-#if CPU(ARM64)
-    static constexpr bool hasPairOp = true;
-#else
-    static constexpr bool hasPairOp = false;
-#endif
+    static constexpr bool hasPairOp = isARM() || isARM64();
 
     Op& op() { return *reinterpret_cast<Op*>(this); }
 
@@ -164,9 +163,16 @@ public:
     ALWAYS_INLINE void finalizeFPR() { finalize<FPRReg>(); }
 
 private:
-#if CPU(ARM64)
-    template<typename RegType>
-    ALWAYS_INLINE void executePair(ptrdiff_t offset, RegType reg1, RegType reg2)
+#if CPU(ARM64) || CPU(ARM)
+    ALWAYS_INLINE void executePair(ptrdiff_t offset, GPRReg reg1, GPRReg reg2)
+    {
+#if USE(JSVALUE64)
+        m_jit.loadPair64(m_baseGPR, TrustedImm32(offset), reg1, reg2);
+#else
+        m_jit.loadPair32(m_baseGPR, TrustedImm32(offset), reg1, reg2);
+#endif
+    }
+    ALWAYS_INLINE void executePair(ptrdiff_t offset, FPRReg reg1, FPRReg reg2)
     {
         m_jit.loadPair64(m_baseGPR, TrustedImm32(offset), reg1, reg2);
     }
@@ -206,9 +212,16 @@ public:
     ALWAYS_INLINE void finalizeFPR() { finalize<FPRReg>(); }
 
 private:
-#if CPU(ARM64)
-    template<typename RegType>
-    ALWAYS_INLINE void executePair(ptrdiff_t offset, RegType reg1, RegType reg2)
+#if CPU(ARM64) || CPU(ARM)
+    ALWAYS_INLINE void executePair(ptrdiff_t offset, GPRReg reg1, GPRReg reg2)
+    {
+#if USE(JSVALUE64)
+        m_jit.storePair64(reg1, reg2, m_baseGPR, TrustedImm32(offset));
+#else
+        m_jit.storePair32(reg1, reg2, m_baseGPR, TrustedImm32(offset));
+#endif
+    }
+    ALWAYS_INLINE void executePair(ptrdiff_t offset, FPRReg reg1, FPRReg reg2)
     {
         m_jit.storePair64(reg1, reg2, m_baseGPR, TrustedImm32(offset));
     }
@@ -263,8 +276,8 @@ public:
         , m_temp1FPR(fpTemp1)
         , m_temp2FPR(fpTemp2)
         , m_bufferRegsAttr(attribute)
-    {
-        if constexpr (hasPairOp && !isARM64())
+        {
+        if constexpr (hasPairOp && !(isARM() || isARM64()))
             RELEASE_ASSERT_NOT_REACHED(); // unsupported architecture.
     }
 
@@ -522,15 +535,31 @@ protected:
         m_jit.storeDouble(src, Address(m_dstBufferGPR, offset));
     }
 
-#if CPU(ARM64)
-    template<typename RegType>
-    ALWAYS_INLINE void loadPair(int offset, RegType dest1, RegType dest2)
+#if CPU(ARM64) || CPU(ARM)
+    ALWAYS_INLINE void loadPair(int offset, GPRReg dest1, GPRReg dest2)
+    {
+#if USE(JSVALUE64)
+        m_jit.loadPair64(m_srcBufferGPR, TrustedImm32(offset), dest1, dest2);
+#else
+        m_jit.loadPair32(m_srcBufferGPR, TrustedImm32(offset), dest1, dest2);
+#endif
+    }
+
+    ALWAYS_INLINE void loadPair(int offset, FPRReg dest1, FPRReg dest2)
     {
         m_jit.loadPair64(m_srcBufferGPR, TrustedImm32(offset), dest1, dest2);
     }
 
-    template<typename RegType>
-    ALWAYS_INLINE void storePair(RegType src1, RegType src2, int offset)
+    ALWAYS_INLINE void storePair(GPRReg src1, GPRReg src2, int offset)
+    {
+#if USE(JSVALUE64)
+        m_jit.storePair64(src1, src2, m_dstBufferGPR, TrustedImm32(offset));
+#else
+        m_jit.storePair32(src1, src2, m_dstBufferGPR, TrustedImm32(offset));
+#endif
+    }
+
+    ALWAYS_INLINE void storePair(FPRReg src1, FPRReg src2, int offset)
     {
         m_jit.storePair64(src1, src2, m_dstBufferGPR, TrustedImm32(offset));
     }

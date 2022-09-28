@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2022 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -58,6 +58,7 @@ public:
     PageReservation() = default;
 
     using PageBlock::base;
+    using PageBlock::end;
     using PageBlock::size;
     using PageBlock::operator bool;
 
@@ -142,7 +143,6 @@ public:
 private:
     PageReservation(void* base, size_t size, bool writable, bool executable, bool, bool hasGuardPages)
         : PageBlock(base, size, hasGuardPages)
-        , m_committed(0)
         , m_writable(writable)
         , m_executable(executable)
     {

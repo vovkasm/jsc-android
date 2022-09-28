@@ -37,13 +37,10 @@ OSRExit::OSRExit(unsigned id, const OriginStack& origin, ExitKind kind, bool isW
     , m_id(id)
     , m_exitKind(kind)
     , m_isWatchpoint(isWatchpoint)
-    , m_counter(0)
 {
 }
 
-OSRExit::~OSRExit()
-{
-}
+OSRExit::~OSRExit() = default;
 
 JSValue OSRExit::toJS(JSGlobalObject* globalObject) const
 {
@@ -51,7 +48,7 @@ JSValue OSRExit::toJS(JSGlobalObject* globalObject) const
     JSObject* result = constructEmptyObject(globalObject);
     result->putDirect(vm, vm.propertyNames->id, jsNumber(m_id));
     result->putDirect(vm, vm.propertyNames->origin, m_origin.toJS(globalObject));
-    result->putDirect(vm, vm.propertyNames->exitKind, jsString(vm, exitKindToString(m_exitKind)));
+    result->putDirect(vm, vm.propertyNames->exitKind, jsNontrivialString(vm, exitKindToString(m_exitKind)));
     result->putDirect(vm, vm.propertyNames->isWatchpoint, jsBoolean(m_isWatchpoint));
     result->putDirect(vm, vm.propertyNames->count, jsNumber(m_counter));
     return result;

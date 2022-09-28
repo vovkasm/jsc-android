@@ -57,10 +57,10 @@ public:
 
     DECLARE_EXPORT_INFO;
 
-    JS_EXPORT_PRIVATE static WebAssemblyFunction* create(VM&, JSGlobalObject*, Structure*, unsigned, const String&, JSWebAssemblyInstance*, Wasm::Callee& jsEntrypoint, WasmToWasmImportableFunction::LoadLocation, Wasm::SignatureIndex);
+    JS_EXPORT_PRIVATE static WebAssemblyFunction* create(VM&, JSGlobalObject*, Structure*, unsigned, const String&, JSWebAssemblyInstance*, Wasm::Callee& jsEntrypoint, WasmToWasmImportableFunction::LoadLocation, Wasm::TypeIndex);
     static Structure* createStructure(VM&, JSGlobalObject*, JSValue);
 
-    MacroAssemblerCodePtr<WasmEntryPtrTag> jsEntrypoint(ArityCheckMode arity)
+    CodePtr<WasmEntryPtrTag> jsEntrypoint(ArityCheckMode arity)
     {
         if (arity == ArityCheckNotRequired)
             return m_jsEntrypoint;
@@ -68,7 +68,7 @@ public:
         return m_jsEntrypoint;
     }
 
-    MacroAssemblerCodePtr<JSEntryPtrTag> jsCallEntrypoint()
+    CodePtr<JSEntryPtrTag> jsCallEntrypoint()
     {
         if (m_jsCallEntrypoint)
             return m_jsCallEntrypoint.code();
@@ -80,9 +80,9 @@ public:
 
 private:
     DECLARE_VISIT_CHILDREN;
-    WebAssemblyFunction(VM&, NativeExecutable*, JSGlobalObject*, Structure*, Wasm::Callee& jsEntrypoint, WasmToWasmImportableFunction::LoadLocation entrypointLoadLocation, Wasm::SignatureIndex);
+    WebAssemblyFunction(VM&, NativeExecutable*, JSGlobalObject*, Structure*, Wasm::Callee& jsEntrypoint, WasmToWasmImportableFunction::LoadLocation entrypointLoadLocation, Wasm::TypeIndex);
 
-    MacroAssemblerCodePtr<JSEntryPtrTag> jsCallEntrypointSlow();
+    CodePtr<JSEntryPtrTag> jsCallEntrypointSlow();
     ptrdiff_t previousInstanceOffset() const;
     bool usesTagRegisters() const;
 
@@ -91,7 +91,7 @@ private:
     // It's safe to just hold the raw jsEntrypoint because we have a reference
     // to our Instance, which points to the Module that exported us, which
     // ensures that the actual Signature/code doesn't get deallocated.
-    MacroAssemblerCodePtr<WasmEntryPtrTag> m_jsEntrypoint;
+    CodePtr<WasmEntryPtrTag> m_jsEntrypoint;
     WriteBarrier<JSToWasmICCallee> m_jsToWasmICCallee;
     // Used for JS calling into Wasm.
     MacroAssemblerCodeRef<JSEntryPtrTag> m_jsCallEntrypoint;

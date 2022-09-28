@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2021 Apple Inc. All rights reserved.
+ * Copyright (C) 2009-2022 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -60,7 +60,6 @@ namespace JSC {
 class LinkBuffer {
     WTF_MAKE_NONCOPYABLE(LinkBuffer); WTF_MAKE_FAST_ALLOCATED;
     
-    template<PtrTag tag> using CodePtr = MacroAssemblerCodePtr<tag>;
     template<PtrTag tag> using CodeRef = MacroAssemblerCodeRef<tag>;
     typedef MacroAssembler::Label Label;
     typedef MacroAssembler::Jump Jump;
@@ -115,24 +114,15 @@ public:
     static constexpr unsigned numberOfProfilesExcludingTotal = numberOfProfiles - 1;
 
     LinkBuffer(MacroAssembler& macroAssembler, void* ownerUID, Profile profile = Profile::Uncategorized, JITCompilationEffort effort = JITCompilationMustSucceed)
-        : m_size(0)
-        , m_didAllocate(false)
-#ifndef NDEBUG
-        , m_completed(false)
-#endif
-        , m_profile(profile)
+        : m_profile(profile)
     {
         UNUSED_PARAM(ownerUID);
         linkCode(macroAssembler, effort);
     }
 
     template<PtrTag tag>
-    LinkBuffer(MacroAssembler& macroAssembler, MacroAssemblerCodePtr<tag> code, size_t size, Profile profile = Profile::Uncategorized, JITCompilationEffort effort = JITCompilationMustSucceed, bool shouldPerformBranchCompaction = true)
+    LinkBuffer(MacroAssembler& macroAssembler, CodePtr<tag> code, size_t size, Profile profile = Profile::Uncategorized, JITCompilationEffort effort = JITCompilationMustSucceed, bool shouldPerformBranchCompaction = true)
         : m_size(size)
-        , m_didAllocate(false)
-#ifndef NDEBUG
-        , m_completed(false)
-#endif
         , m_profile(profile)
         , m_code(code.template retagged<LinkBufferPtrTag>())
     {
@@ -144,9 +134,7 @@ public:
         linkCode(macroAssembler, effort);
     }
 
-    ~LinkBuffer()
-    {
-    }
+    ~LinkBuffer() = default;
 
     void runMainThreadFinalizationTasks();
     
@@ -172,12 +160,12 @@ public:
     template<PtrTag tag, typename Func, typename = std::enable_if_t<std::is_function<typename std::remove_pointer<Func>::type>::value>>
     void link(Call call, Func funcName)
     {
-        FunctionPtr<tag> function(funcName);
+        CodePtr<tag> function(funcName);
         link(call, function);
     }
 
     template<PtrTag tag>
-    void link(Call call, FunctionPtr<tag> function)
+    void link(Call call, CodePtr<tag> function)
     {
         ASSERT(call.isFlagSet(Call::Linkable));
         call.m_label = applyOffset(call.m_label);
@@ -187,7 +175,7 @@ public:
     template<PtrTag tag>
     void link(Call call, CodeLocationLabel<tag> label)
     {
-        link(call, FunctionPtr<tag>(label));
+        link(call, CodePtr<tag>(label));
     }
     
     template<PtrTag tag>
@@ -342,6 +330,8 @@ public:
         m_mainThreadFinalizationTasks.append(createSharedTask<void()>(functor));
     }
 
+    void setIsThunk() { m_isThunk = true; }
+
 private:
     JS_EXPORT_PRIVATE CodeRef<LinkBufferPtrTag> finalizeCodeWithoutDisassemblyImpl();
     JS_EXPORT_PRIVATE CodeRef<LinkBufferPtrTag> finalizeCodeWithDisassemblyImpl(bool dumpDisassembly, const char* format, ...) WTF_ATTRIBUTE_PRINTF(3, 4);
@@ -372,6 +362,8 @@ private:
     {
         return m_code.dataLocation();
     }
+
+    void linkComments(MacroAssembler&);
     
     void allocate(MacroAssembler&, JITCompilationEffort);
 
@@ -401,7 +393,7 @@ private:
 #endif
 
     RefPtr<ExecutableMemoryHandle> m_executableMemory;
-    size_t m_size;
+    size_t m_size { 0 };
 #if ENABLE(BRANCH_COMPACTION)
     AssemblerData m_assemblerStorage;
 #if CPU(ARM64E)
@@ -409,16 +401,17 @@ private:
 #endif
     bool m_shouldPerformBranchCompaction { true };
 #endif
-    bool m_didAllocate;
+    bool m_didAllocate { false };
 #ifndef NDEBUG
-    bool m_completed;
+    bool m_completed { false };
 #endif
 #if ASSERT_ENABLED
     bool m_isJumpIsland { false };
 #endif
     bool m_alreadyDisassembled { false };
+    bool m_isThunk { false };
     Profile m_profile { Profile::Uncategorized };
-    MacroAssemblerCodePtr<LinkBufferPtrTag> m_code;
+    CodePtr<LinkBufferPtrTag> m_code;
     Vector<RefPtr<SharedTask<void(LinkBuffer&)>>> m_linkTasks;
     Vector<RefPtr<SharedTask<void(LinkBuffer&)>>> m_lateLinkTasks;
     Vector<RefPtr<SharedTask<void()>>> m_mainThreadFinalizationTasks;

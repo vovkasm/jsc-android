@@ -52,12 +52,11 @@ class RefCounter {
 
         Count(RefCounter& refCounter)
             : m_refCounter(&refCounter)
-            , m_value(0)
         {
         }
 
         RefCounter* m_refCounter;
-        size_t m_value;
+        size_t m_value { 0 };
         bool m_inValueDidChange { false };
     };
 
@@ -96,12 +95,15 @@ inline void RefCounter<T>::Count::deref()
 {
     ASSERT(m_value);
 
+    // GCC gets confused here, see https://webkit.org/b/239338.
+IGNORE_GCC_WARNINGS_BEGIN("use-after-free")
     --m_value;
 
     if (m_refCounter && m_refCounter->m_valueDidChange) {
-        SetForScope<bool> inCallback(m_inValueDidChange, true);
+        SetForScope inCallback(m_inValueDidChange, true);
         m_refCounter->m_valueDidChange(RefCounterEvent::Decrement);
     }
+IGNORE_GCC_WARNINGS_END
 
     // The Count object is kept alive so long as either the RefCounter that created it remains
     // allocated, or so long as its reference count is non-zero.

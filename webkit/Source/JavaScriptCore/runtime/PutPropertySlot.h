@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2018 Apple Inc. All rights reserved.
+ * Copyright (C) 2008-2022 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,23 +34,19 @@ namespace JSC {
 class JSObject;
 class JSFunction;
     
+using CustomAccessorValueFunc = FunctionPtr<CustomAccessorPtrTag, bool(JSGlobalObject*, EncodedJSValue, EncodedJSValue, PropertyName)>;
+
 class PutPropertySlot {
 public:
     enum Type : uint8_t { Uncachable, ExistingProperty, NewProperty, SetterProperty, CustomValue, CustomAccessor };
     enum Context : uint8_t { UnknownContext, PutById, PutByIdEval, ReflectSet };
-    using PutValueFunc = JSC::PutValueFunc;
-    using PutValueFuncWithPtr = JSC::PutValueFuncWithPtr;
 
     PutPropertySlot(JSValue thisValue, bool isStrictMode = false, Context context = UnknownContext, bool isInitialization = false)
-        : m_base(nullptr)
-        , m_thisValue(thisValue)
+        : m_thisValue(thisValue)
         , m_offset(invalidOffset)
         , m_isStrictMode(isStrictMode)
         , m_isInitialization(isInitialization)
-        , m_isTaintedByOpaqueObject(false)
-        , m_type(Uncachable)
         , m_context(context)
-        , m_cacheability(CachingAllowed)
     {
     }
 
@@ -72,14 +68,14 @@ public:
     {
         m_type = CustomValue;
         m_base = base;
-        m_putFunction = function;
+        m_putFunction = function.get();
     }
 
     void setCustomAccessor(JSObject* base, PutValueFunc function)
     {
         m_type = CustomAccessor;
         m_base = base;
-        m_putFunction = function;
+        m_putFunction = function.get();
     }
 
     void setCacheableSetter(JSObject* base, PropertyOffset offset)
@@ -99,7 +95,7 @@ public:
         m_isStrictMode = value;
     }
 
-    FunctionPtr<CustomAccessorPtrTag> customSetter() const
+    CustomAccessorValueFunc customSetter() const
     {
         ASSERT(isCacheableCustom());
         return m_putFunction;
@@ -132,16 +128,16 @@ public:
 private:
     bool isCacheable() const { return m_cacheability == CachingAllowed; }
 
-    JSObject* m_base;
+    JSObject* m_base { nullptr };
     JSValue m_thisValue;
     PropertyOffset m_offset;
     bool m_isStrictMode : 1;
     bool m_isInitialization : 1;
-    bool m_isTaintedByOpaqueObject : 1;
-    Type m_type;
+    bool m_isTaintedByOpaqueObject : 1 { false };
+    Type m_type { Uncachable };
     Context m_context;
-    CacheabilityType m_cacheability;
-    FunctionPtr<CustomAccessorPtrTag> m_putFunction;
+    CacheabilityType m_cacheability { CachingAllowed };
+    CustomAccessorValueFunc m_putFunction;
 };
 
 } // namespace JSC

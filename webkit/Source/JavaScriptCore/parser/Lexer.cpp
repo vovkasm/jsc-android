@@ -487,10 +487,9 @@ static constexpr const LChar singleCharacterEscapeValuesForASCII[128] = {
 /* 127 - Delete             */ 0
 };
 
-template <typename T>
+template<typename T>
 Lexer<T>::Lexer(VM& vm, JSParserBuiltinMode builtinMode, JSParserScriptMode scriptMode)
-    : m_positionBeforeLastNewline(0,0,0)
-    , m_isReparsingFunction(false)
+    : m_positionBeforeLastNewline(0, 0, 0)
     , m_vm(vm)
     , m_parsingBuiltinFunction(builtinMode == JSParserBuiltinMode::Builtin)
     , m_scriptMode(scriptMode)
@@ -504,10 +503,8 @@ static inline JSTokenType tokenTypeForIntegerLikeToken(double doubleValue)
     return DOUBLE;
 }
 
-template <typename T>
-Lexer<T>::~Lexer()
-{
-}
+template<typename T>
+Lexer<T>::~Lexer() = default;
 
 template <typename T>
 String Lexer<T>::invalidCharacterMessage() const
@@ -712,6 +709,7 @@ void Lexer<T>::shiftLineTerminator()
         shift();
 
     ++m_lineNumber;
+    m_lineStart = m_code;
 }
 
 template <typename T>
@@ -2099,11 +2097,15 @@ start:
         }
         if (m_current == '*') {
             shift();
+            auto startLineNumber = m_lineNumber;
+            auto startLineStartOffset = currentLineStartOffset();
             if (parseMultilineComment())
                 goto start;
             m_lexErrorMessage = "Multiline comment was not closed properly"_s;
             token = UNTERMINATED_MULTILINE_COMMENT_ERRORTOK;
-            goto returnError;
+            m_error = true;
+            fillTokenInfo(tokenRecord, token, startLineNumber, currentOffset(), startLineStartOffset, currentPosition());
+            return token;
         }
         if (m_current == '=') {
             shift();
@@ -2472,6 +2474,8 @@ start:
         m_buffer8.shrink(0);
         break;
     case CharacterQuote: {
+        auto startLineNumber = m_lineNumber;
+        auto startLineStartOffset = currentLineStartOffset();
         StringParseResult result = StringCannotBeParsed;
         if (lexerFlags.contains(LexerFlags::DontBuildStrings))
             result = parseString<false>(tokenData, strictMode);
@@ -2480,12 +2484,16 @@ start:
 
         if (UNLIKELY(result != StringParsedSuccessfully)) {
             token = result == StringUnterminated ? UNTERMINATED_STRING_LITERAL_ERRORTOK : INVALID_STRING_LITERAL_ERRORTOK;
-            goto returnError;
+            m_error = true;
+            fillTokenInfo(tokenRecord, token, startLineNumber, currentOffset(), startLineStartOffset, currentPosition());
+            return token;
         }
         shift();
         token = STRING;
-        break;
-        }
+        m_atLineStart = false;
+        fillTokenInfo(tokenRecord, token, startLineNumber, currentOffset(), startLineStartOffset, currentPosition());
+        return token;
+    }
     case CharacterIdentifierStart: {
         if constexpr (ASSERT_ENABLED) {
             UChar32 codePoint;
@@ -2506,7 +2514,6 @@ start:
         shiftLineTerminator();
         m_atLineStart = true;
         m_hasLineTerminatorBeforeToken = true;
-        m_lineStart = m_code;
         goto start;
     case CharacterHash: {
         // Hashbang is only permitted at the start of the source text.
@@ -2567,7 +2574,6 @@ inSingleLineComment:
         shiftLineTerminator();
         m_atLineStart = true;
         m_hasLineTerminatorBeforeToken = true;
-        m_lineStart = m_code;
         if (!lastTokenWasRestrKeyword())
             goto start;
 
@@ -2676,7 +2682,7 @@ JSTokenType Lexer<T>::scanRegExp(JSToken* tokenRecord, UChar patternPrefix)
         m_error = true;
         String codePoint = String::fromCodePoint(currentCodePoint());
         if (!codePoint)
-            codePoint = "`invalid unicode character`";
+            codePoint = "`invalid unicode character`"_s;
         m_lexErrorMessage = makeString("Invalid non-latin character in RexExp literal's flags '", getToken(*tokenRecord), codePoint, "'");
         return token;
     }
@@ -2699,6 +2705,9 @@ JSTokenType Lexer<T>::scanTemplateString(JSToken* tokenRecord, RawStringsBuildMo
     ASSERT(!m_error);
     ASSERT(m_buffer16.isEmpty());
 
+    int startingLineStartOffset = currentLineStartOffset();
+    int startingLineNumber = lineNumber();
+
     // Leading backquote ` (for template head) or closing brace } (for template trailing) are already shifted in the previous token scan.
     // So in this re-scan phase, shift() is not needed here.
     StringParseResult result = parseTemplateLiteral(tokenData, rawStringsBuildMode);
@@ -2711,7 +2720,7 @@ JSTokenType Lexer<T>::scanTemplateString(JSToken* tokenRecord, RawStringsBuildMo
 
     // Since TemplateString always ends with ` or }, m_atLineStart always becomes false.
     m_atLineStart = false;
-    fillTokenInfo(tokenRecord, token, m_lineNumber, currentOffset(), currentLineStartOffset(), currentPosition());
+    fillTokenInfo(tokenRecord, token, startingLineNumber, currentOffset(), startingLineStartOffset, currentPosition());
     return token;
 }
 

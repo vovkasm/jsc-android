@@ -27,8 +27,8 @@
 
 #if ENABLE(JIT)
 
+#include "FPRInfo.h"
 #include "RegisterSet.h"
-#include "TempRegisterSet.h"
 
 namespace JSC {
 
@@ -39,9 +39,9 @@ struct ScratchBuffer;
 
 class ScratchRegisterAllocator {
 public:
-    ScratchRegisterAllocator() { }
+    ScratchRegisterAllocator() = default;
     ScratchRegisterAllocator(const RegisterSet& usedRegisters);
-    ~ScratchRegisterAllocator();
+    ~ScratchRegisterAllocator() = default;
 
     void lock(GPRReg);
     void lock(FPRReg);
@@ -96,9 +96,9 @@ public:
 
 private:
     RegisterSet m_usedRegisters;
-    TempRegisterSet m_lockedRegisters;
-    TempRegisterSet m_scratchRegisters;
-    unsigned m_numberOfReusedRegisters;
+    RegisterSet m_lockedRegisters;
+    RegisterSet m_scratchRegisters;
+    unsigned m_numberOfReusedRegisters { 0 };
 };
 
 } // namespace JSC

@@ -25,6 +25,7 @@
 
 #include "config.h"
 #include "WasmCallee.h"
+#include "runtime/VM.h"
 
 #if ENABLE(WEBASSEMBLY)
 
@@ -47,14 +48,85 @@ Callee::Callee(Wasm::CompilationMode compilationMode, size_t index, std::pair<co
     CalleeRegistry::singleton().registerCallee(this);
 }
 
-Callee::~Callee()
+template<typename Func>
+inline void Callee::runWithDowncast(const Func& func)
 {
-    CalleeRegistry::singleton().unregisterCallee(this);
+    switch (m_compilationMode) {
+    case CompilationMode::LLIntMode:
+        func(static_cast<LLIntCallee*>(this));
+        break;
+#if ENABLE(WEBASSEMBLY_B3JIT)
+    case CompilationMode::BBQMode:
+        func(static_cast<BBQCallee*>(this));
+        break;
+    case CompilationMode::BBQForOSREntryMode:
+        func(static_cast<OSREntryCallee*>(this));
+        break;
+    case CompilationMode::OMGMode:
+        func(static_cast<OMGCallee*>(this));
+        break;
+    case CompilationMode::OMGForOSREntryMode:
+        func(static_cast<OSREntryCallee*>(this));
+        break;
+#else
+    case CompilationMode::BBQMode:
+    case CompilationMode::BBQForOSREntryMode:
+    case CompilationMode::OMGMode:
+    case CompilationMode::OMGForOSREntryMode:
+        break;
+#endif
+    case CompilationMode::EmbedderEntrypointMode:
+        func(static_cast<EmbedderEntrypointCallee*>(this));
+        break;
+    }
+}
+
+template<typename Func>
+inline void Callee::runWithDowncast(const Func& func) const
+{
+    const_cast<Callee*>(this)->runWithDowncast(func);
 }
 
 void Callee::dump(PrintStream& out) const
 {
     out.print(makeString(m_indexOrName));
+}
+
+CodePtr<WasmEntryPtrTag> Callee::entrypoint() const
+{
+    CodePtr<WasmEntryPtrTag> codePtr;
+    runWithDowncast([&](auto* derived) {
+        codePtr = derived->entrypointImpl();
+    });
+    return codePtr;
+}
+
+std::tuple<void*, void*> Callee::range() const
+{
+    std::tuple<void*, void*> result;
+    runWithDowncast([&](auto* derived) {
+        result = derived->rangeImpl();
+    });
+    return result;
+}
+
+RegisterAtOffsetList* Callee::calleeSaveRegisters()
+{
+    RegisterAtOffsetList* result = nullptr;
+    runWithDowncast([&](auto* derived) {
+        result = derived->calleeSaveRegistersImpl();
+    });
+    return result;
+}
+
+void Callee::operator delete(Callee* callee, std::destroying_delete_t)
+{
+    CalleeRegistry::singleton().unregisterCallee(callee);
+    callee->runWithDowncast([](auto* derived) {
+        using T = std::decay_t<decltype(*derived)>;
+        derived->~T();
+    });
+    Callee::freeAfterDestruction(callee);
 }
 
 const HandlerInfo* Callee::handlerForIndex(Instance& instance, unsigned index, const Tag* tag)
@@ -100,26 +172,16 @@ LLIntCallee::LLIntCallee(FunctionCodeBlockGenerator& generator, size_t index, st
             auto& instruction = *m_instructions->at(unlinkedHandler.m_target).ptr();
             CodeLocationLabel<ExceptionHandlerPtrTag> target;
             if (unlinkedHandler.m_type == HandlerType::Catch)
-                target = CodeLocationLabel<ExceptionHandlerPtrTag>(LLInt::handleWasmCatch(instruction.width<WasmOpcodeTraits>()).code());
+                target = CodeLocationLabel<ExceptionHandlerPtrTag>(LLInt::handleWasmCatch(instruction.width()).code());
             else
-                target = CodeLocationLabel<ExceptionHandlerPtrTag>(LLInt::handleWasmCatchAll(instruction.width<WasmOpcodeTraits>()).code());
+                target = CodeLocationLabel<ExceptionHandlerPtrTag>(LLInt::handleWasmCatchAll(instruction.width()).code());
 
             handler.initialize(unlinkedHandler, target);
         }
     }
 }
 
-void LLIntCallee::setEntrypoint(MacroAssemblerCodePtr<WasmEntryPtrTag> entrypoint)
-{
-    m_entrypoint = entrypoint;
-}
-
-MacroAssemblerCodePtr<WasmEntryPtrTag> LLIntCallee::entrypoint() const
-{
-    return m_entrypoint;
-}
-
-RegisterAtOffsetList* LLIntCallee::calleeSaveRegisters()
+RegisterAtOffsetList* LLIntCallee::calleeSaveRegistersImpl()
 {
     static LazyNeverDestroyed<RegisterAtOffsetList> calleeSaveRegisters;
     static std::once_flag initializeFlag;
@@ -130,6 +192,8 @@ RegisterAtOffsetList* LLIntCallee::calleeSaveRegisters()
         registers.set(GPRInfo::regCS2); // PB
 #elif CPU(ARM64) || CPU(RISCV64)
         registers.set(GPRInfo::regCS7); // PB
+#elif CPU(ARM)
+        registers.set(GPRInfo::regCS1); // PB
 #else
 #error Unsupported architecture.
 #endif
@@ -139,24 +203,20 @@ RegisterAtOffsetList* LLIntCallee::calleeSaveRegisters()
     return &calleeSaveRegisters.get();
 }
 
-std::tuple<void*, void*> LLIntCallee::range() const
-{
-    return { nullptr, nullptr };
-}
-
-InstructionStream::Offset LLIntCallee::outOfLineJumpOffset(InstructionStream::Offset bytecodeOffset)
+WasmInstructionStream::Offset LLIntCallee::outOfLineJumpOffset(WasmInstructionStream::Offset bytecodeOffset)
 {
     ASSERT(m_outOfLineJumpTargets.contains(bytecodeOffset));
     return m_outOfLineJumpTargets.get(bytecodeOffset);
 }
 
-const Instruction* LLIntCallee::outOfLineJumpTarget(const Instruction* pc)
+const WasmInstruction* LLIntCallee::outOfLineJumpTarget(const WasmInstruction* pc)
 {
     int offset = bytecodeOffset(pc);
     int target = outOfLineJumpOffset(offset);
     return m_instructions->at(offset + target).ptr();
 }
 
+#if ENABLE(WEBASSEMBLY_B3JIT)
 void OptimizingJITCallee::linkExceptionHandlers(Vector<UnlinkedHandlerInfo> unlinkedExceptionHandlers, Vector<CodeLocationLabel<ExceptionHandlerPtrTag>> exceptionHandlerLocations)
 {
     size_t count = unlinkedExceptionHandlers.size();
@@ -183,7 +243,7 @@ const StackMap& OptimizingJITCallee::stackmap(CallSiteIndex callSiteIndex) const
     RELEASE_ASSERT(iter != m_stackmaps.end());
     return iter->value;
 }
-
+#endif
 
 } } // namespace JSC::Wasm
 

@@ -67,10 +67,9 @@ static_assert(WTF::getMSBSetConstexpr(static_cast<std::underlying_type_t<JITType
 
 class JITCode : public ThreadSafeRefCounted<JITCode> {
 public:
-    template<PtrTag tag> using CodePtr = MacroAssemblerCodePtr<tag>;
     template<PtrTag tag> using CodeRef = MacroAssemblerCodeRef<tag>;
 
-    static const char* typeName(JITType);
+    static ASCIILiteral typeName(JITType);
 
     static JITType bottomTierJIT()
     {
@@ -161,16 +160,10 @@ public:
         return jitType == JITType::InterpreterThunk || jitType == JITType::BaselineJIT;
     }
 
-    static bool useDataIC(JITType jitType)
-    {
-        if (JITCode::isBaselineCode(jitType))
-            return true;
-        if (!Options::useDataIC())
-            return false;
-        return Options::useDataICInOptimizingJIT();
-    }
-
     virtual const DOMJIT::Signature* signature() const { return nullptr; }
+
+    virtual bool canSwapCodeRefForDebugger() const { return false; }
+    virtual CodeRef<JSEntryPtrTag> swapCodeRefForDebugger(CodeRef<JSEntryPtrTag>);
     
     enum class ShareAttribute : uint8_t {
         NotShared,
@@ -187,6 +180,8 @@ public:
     {
         return m_jitType;
     }
+
+    bool isUnlinked() const;
     
     template<typename PointerType>
     static JITType jitTypeFor(PointerType jitCode)
@@ -231,6 +226,8 @@ public:
 
     const RegisterAtOffsetList* calleeSaveRegisters() const;
 
+    static ptrdiff_t offsetOfJITType() { return OBJECT_OFFSETOF(JITCode, m_jitType); }
+
 private:
     const JITType m_jitType;
     const ShareAttribute m_shareAttribute;
@@ -251,6 +248,8 @@ public:
     unsigned offsetOf(void* pointerIntoCode) override;
     size_t size() override;
     bool contains(void*) override;
+
+    CodeRef<JSEntryPtrTag> swapCodeRefForDebugger(CodeRef<JSEntryPtrTag>) override;
 
 protected:
     CodeRef<JSEntryPtrTag> m_ref;
@@ -281,6 +280,8 @@ public:
     ~NativeJITCode() override;
 
     CodePtr<JSEntryPtrTag> addressForCall(ArityCheckMode) override;
+
+    bool canSwapCodeRefForDebugger() const override { return true; }
 };
 
 class NativeDOMJITCode final : public NativeJITCode {

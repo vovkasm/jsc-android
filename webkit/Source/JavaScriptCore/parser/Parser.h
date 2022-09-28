@@ -66,7 +66,7 @@ struct DebuggerParseData;
 #define TreePropertyList typename TreeBuilder::PropertyList
 #define TreeDestructuringPattern typename TreeBuilder::DestructuringPattern
 
-COMPILE_ASSERT(LastUntaggedToken < 64, LessThan64UntaggedTokens);
+static_assert(LastUntaggedToken < 64, "Less than 64 untagged tokens");
 
 enum SourceElementsMode { CheckForStrictMode, DontCheckForStrictMode };
 enum FunctionBodyType { ArrowFunctionBodyExpression, ArrowFunctionBodyBlock, StandardFunctionBodyBlock };
@@ -148,44 +148,25 @@ struct Scope {
     WTF_MAKE_NONCOPYABLE(Scope);
 
 public:
-    Scope(const VM& vm, LexicalScopeFeatures lexicalScopeFeatures, bool isFunction, bool isGenerator, bool isArrowFunction, bool isAsyncFunction)
+    Scope(const VM& vm, ImplementationVisibility implementationVisibility, LexicalScopeFeatures lexicalScopeFeatures, bool isFunction, bool isGenerator, bool isArrowFunction, bool isAsyncFunction)
         : m_vm(vm)
-        , m_shadowsArguments(false)
-        , m_usesEval(false)
-        , m_needsFullActivation(false)
-        , m_hasDirectSuper(false)
-        , m_needsSuperBinding(false)
-        , m_allowsVarDeclarations(true)
-        , m_allowsLexicalDeclarations(true)
+        , m_implementationVisibility(implementationVisibility)
         , m_lexicalScopeFeatures(lexicalScopeFeatures)
         , m_isFunction(isFunction)
         , m_isGenerator(isGenerator)
-        , m_isGeneratorBoundary(false)
         , m_isArrowFunction(isArrowFunction)
-        , m_isArrowFunctionBoundary(false)
         , m_isAsyncFunction(isAsyncFunction)
-        , m_isAsyncFunctionBoundary(false)
-        , m_isLexicalScope(false)
-        , m_isGlobalCodeScope(false)
-        , m_isSimpleCatchParameterScope(false)
-        , m_isCatchBlockScope(false)
-        , m_isFunctionBoundary(false)
-        , m_isValidStrictMode(true)
-        , m_hasArguments(false)
-        , m_isEvalContext(false)
-        , m_hasNonSimpleParameterList(false)
-        , m_isClassScope(false)
-        , m_evalContextType(EvalContextType::None)
-        , m_constructorKind(static_cast<unsigned>(ConstructorKind::None))
-        , m_expectedSuperBinding(static_cast<unsigned>(SuperBinding::NotNeeded))
-        , m_loopDepth(0)
-        , m_switchDepth(0)
-        , m_innerArrowFunctionFeatures(0)
     {
         m_usedVariables.append(UniquedStringImplPtrSet());
     }
 
     Scope(Scope&&) = default;
+
+    ImplementationVisibility implementationVisibility() const { return m_implementationVisibility; }
+    void resetImplementationVisibility()
+    {
+        m_implementationVisibility = ImplementationVisibility::Public;
+    }
 
     void startSwitch() { m_switchDepth++; }
     void endSwitch() { m_switchDepth--; }
@@ -314,8 +295,9 @@ public:
         m_isClassScope = true;
     }
 
-    bool isLexicalScope() { return m_isLexicalScope; }
-    bool usesEval() { return m_usesEval; }
+    bool isLexicalScope() const { return m_isLexicalScope; }
+    bool usesEval() const { return m_usesEval; }
+    bool usesImportMeta() const { return m_usesImportMeta; }
 
     const HashSet<UniquedStringImpl*>& closedVariableCandidates() const { return m_closedVariableCandidates; }
     VariableEnvironment& declaredVariables() { return m_declaredVariables; }
@@ -612,6 +594,8 @@ public:
         useVariable(&ident, false);
     }
 
+    void setUsesImportMeta() { m_usesImportMeta = true; }
+
     void pushUsedVariableSet() { m_usedVariables.append(UniquedStringImplPtrSet()); }
     size_t currentUsedVariablesSize() { return m_usedVariables.size(); }
     void revertToPreviousUsedVariables(size_t size) { m_usedVariables.resize(size); }
@@ -632,10 +616,10 @@ public:
     
     InnerArrowFunctionCodeFeatures innerArrowFunctionFeatures() { return m_innerArrowFunctionFeatures; }
     
-    void setExpectedSuperBinding(SuperBinding superBinding) { m_expectedSuperBinding = static_cast<unsigned>(superBinding); }
-    SuperBinding expectedSuperBinding() const { return static_cast<SuperBinding>(m_expectedSuperBinding); }
-    void setConstructorKind(ConstructorKind constructorKind) { m_constructorKind = static_cast<unsigned>(constructorKind); }
-    ConstructorKind constructorKind() const { return static_cast<ConstructorKind>(m_constructorKind); }
+    void setExpectedSuperBinding(SuperBinding superBinding) { m_expectedSuperBinding = superBinding; }
+    SuperBinding expectedSuperBinding() const { return m_expectedSuperBinding; }
+    void setConstructorKind(ConstructorKind constructorKind) { m_constructorKind = constructorKind; }
+    ConstructorKind constructorKind() const { return m_constructorKind; }
 
     void setInnerArrowFunctionUsesSuperCall() { m_innerArrowFunctionFeatures |= SuperCallInnerArrowFunctionFeature; }
     void setInnerArrowFunctionUsesSuperProperty() { m_innerArrowFunctionFeatures |= SuperPropertyInnerArrowFunctionFeature; }
@@ -663,16 +647,20 @@ public:
         m_closedVariableCandidates.add(impl);
     }
 
-    void markLastUsedVariablesSetAsCaptured()
+    void markLastUsedVariablesSetAsCaptured(unsigned from)
     {
-        for (UniquedStringImpl* impl : m_usedVariables.last())
-            m_closedVariableCandidates.add(impl);
+        for (unsigned index = from; index < m_usedVariables.size(); ++index) {
+            for (UniquedStringImpl* impl : m_usedVariables[index])
+                m_closedVariableCandidates.add(impl);
+        }
     }
     
     void collectFreeVariables(Scope* nestedScope, bool shouldTrackClosedVariables)
     {
         if (nestedScope->m_usesEval)
             m_usesEval = true;
+        if (nestedScope->m_usesImportMeta)
+            m_usesImportMeta = true;
 
         {
             UniquedStringImplPtrSet& destinationSet = m_usedVariables.last();
@@ -767,6 +755,7 @@ public:
     {
         ASSERT(m_isFunction);
         parameters.usesEval = m_usesEval;
+        parameters.usesImportMeta = m_usesImportMeta;
         parameters.lexicalScopeFeatures = m_lexicalScopeFeatures;
         parameters.needsFullActivation = m_needsFullActivation;
         parameters.innerArrowFunctionFeatures = m_innerArrowFunctionFeatures;
@@ -791,6 +780,7 @@ public:
     {
         ASSERT(m_isFunction);
         m_usesEval = info->usesEval;
+        m_usesImportMeta = info->usesImportMeta;
         m_lexicalScopeFeatures = info->lexicalScopeFeatures();
         m_innerArrowFunctionFeatures = info->innerArrowFunctionFeatures;
         m_needsFullActivation = info->needsFullActivation;
@@ -884,37 +874,39 @@ private:
     }
 
     const VM& m_vm;
-    bool m_shadowsArguments;
-    bool m_usesEval;
-    bool m_needsFullActivation;
-    bool m_hasDirectSuper;
-    bool m_needsSuperBinding;
-    bool m_allowsVarDeclarations;
-    bool m_allowsLexicalDeclarations;
+    ImplementationVisibility m_implementationVisibility;
     LexicalScopeFeatures m_lexicalScopeFeatures;
-    bool m_isFunction;
-    bool m_isGenerator;
-    bool m_isGeneratorBoundary;
-    bool m_isArrowFunction;
-    bool m_isArrowFunctionBoundary;
-    bool m_isAsyncFunction;
-    bool m_isAsyncFunctionBoundary;
-    bool m_isLexicalScope;
-    bool m_isGlobalCodeScope;
-    bool m_isSimpleCatchParameterScope;
-    bool m_isCatchBlockScope;
-    bool m_isFunctionBoundary;
-    bool m_isValidStrictMode;
-    bool m_hasArguments;
-    bool m_isEvalContext;
-    bool m_hasNonSimpleParameterList;
-    bool m_isClassScope;
-    EvalContextType m_evalContextType;
-    unsigned m_constructorKind;
-    unsigned m_expectedSuperBinding;
-    int m_loopDepth;
-    int m_switchDepth;
-    InnerArrowFunctionCodeFeatures m_innerArrowFunctionFeatures;
+    bool m_shadowsArguments : 1 { false };
+    bool m_usesEval : 1 { false };
+    bool m_usesImportMeta : 1 { false };
+    bool m_needsFullActivation : 1 { false };
+    bool m_hasDirectSuper : 1 { false };
+    bool m_needsSuperBinding : 1 { false };
+    bool m_allowsVarDeclarations : 1 { true };
+    bool m_allowsLexicalDeclarations : 1 { true };
+    bool m_isFunction : 1;
+    bool m_isGenerator : 1;
+    bool m_isGeneratorBoundary : 1 { false };
+    bool m_isArrowFunction : 1;
+    bool m_isArrowFunctionBoundary : 1 { false };
+    bool m_isAsyncFunction : 1;
+    bool m_isAsyncFunctionBoundary : 1 { false };
+    bool m_isLexicalScope : 1 { false };
+    bool m_isGlobalCodeScope : 1 { false };
+    bool m_isSimpleCatchParameterScope : 1 { false };
+    bool m_isCatchBlockScope : 1 { false };
+    bool m_isFunctionBoundary : 1 { false };
+    bool m_isValidStrictMode : 1 { true };
+    bool m_hasArguments : 1 { false };
+    bool m_isEvalContext : 1 { false };
+    bool m_hasNonSimpleParameterList : 1 { false };
+    bool m_isClassScope : 1 { false };
+    EvalContextType m_evalContextType { EvalContextType::None };
+    ConstructorKind m_constructorKind { ConstructorKind::None };
+    SuperBinding m_expectedSuperBinding { SuperBinding::NotNeeded };
+    int m_loopDepth { 0 };
+    int m_switchDepth { 0 };
+    InnerArrowFunctionCodeFeatures m_innerArrowFunctionFeatures { 0 };
 
     typedef Vector<ScopeLabelInfo, 2> LabelStack;
     std::unique_ptr<LabelStack> m_labels;
@@ -975,7 +967,7 @@ class Parser {
     WTF_MAKE_FAST_ALLOCATED;
 
 public:
-    Parser(VM&, const SourceCode&, JSParserBuiltinMode, JSParserStrictMode, JSParserScriptMode, SourceParseMode, SuperBinding, ConstructorKind defaultConstructorKindForTopLevelFunction = ConstructorKind::None, DerivedContextType = DerivedContextType::None, bool isEvalContext = false, EvalContextType = EvalContextType::None, DebuggerParseData* = nullptr, bool isInsideOrdinaryFunction = false);
+    Parser(VM&, const SourceCode&, ImplementationVisibility, JSParserBuiltinMode, JSParserStrictMode, JSParserScriptMode, SourceParseMode, SuperBinding, ConstructorKind defaultConstructorKindForTopLevelFunction = ConstructorKind::None, DerivedContextType = DerivedContextType::None, bool isEvalContext = false, EvalContextType = EvalContextType::None, DebuggerParseData* = nullptr, bool isInsideOrdinaryFunction = false);
     ~Parser();
 
     template <class ParsedNode>
@@ -1058,11 +1050,7 @@ private:
         // going to create a new lexical scope. If we decide to create a new lexical scope, we
         // can pass the scope into this obejct and it will take care of the cleanup for us if the parse fails.
         // This is helpful if we may fail from syntax errors after creating a lexical scope conditionally.
-        AutoCleanupLexicalScope()
-            : m_scope(nullptr, UINT_MAX)
-            , m_parser(nullptr)
-        {
-        }
+        AutoCleanupLexicalScope() = default;
 
         ~AutoCleanupLexicalScope()
         {
@@ -1090,8 +1078,8 @@ private:
         ScopeRef& scope() { return m_scope; }
 
     private:
-        ScopeRef m_scope;
-        Parser* m_parser;
+        ScopeRef m_scope { nullptr, UINT_MAX };
+        Parser* m_parser { nullptr };
     };
 
     enum ExpressionErrorClass {
@@ -1287,20 +1275,43 @@ private:
 
     ScopeRef pushScope()
     {
+        ImplementationVisibility implementationVisibility = m_implementationVisibility;
         LexicalScopeFeatures lexicalScopeFeatures = NoLexicalFeatures;
         bool isFunction = false;
         bool isGenerator = false;
         bool isArrowFunction = false;
         bool isAsyncFunction = false;
         if (!m_scopeStack.isEmpty()) {
+            implementationVisibility = m_scopeStack.last().implementationVisibility();
             lexicalScopeFeatures = m_scopeStack.last().lexicalScopeFeatures();
             isFunction = m_scopeStack.last().isFunction();
             isGenerator = m_scopeStack.last().isGenerator();
             isArrowFunction = m_scopeStack.last().isArrowFunction();
             isAsyncFunction = m_scopeStack.last().isAsyncFunction();
         }
-        m_scopeStack.constructAndAppend(m_vm, lexicalScopeFeatures, isFunction, isGenerator, isArrowFunction, isAsyncFunction);
+        m_scopeStack.constructAndAppend(m_vm, implementationVisibility, lexicalScopeFeatures, isFunction, isGenerator, isArrowFunction, isAsyncFunction);
         return currentScope();
+    }
+
+    void resetImplementationVisibilityIfNeeded()
+    {
+        // Find the closest function boundary that is not the current scope (if the current scope
+        // is also a function boundary). If the implementation visibility of that scope is not
+        // recursive, reset the implementation visibility of the current scope.
+
+        auto& currentScope = m_scopeStack[m_scopeStack.size() - 1];
+        if (!currentScope.isFunctionBoundary())
+            return;
+
+        for (auto i = m_scopeStack.size() - 1; i > 0; --i) {
+            const auto& scope = m_scopeStack[i - 1];
+            if (!scope.isFunctionBoundary())
+                continue;
+
+            if (scope.implementationVisibility() != ImplementationVisibility::PrivateRecursive)
+                currentScope.resetImplementationVisibility();
+            break;
+        }
     }
 
     std::tuple<VariableEnvironment, DeclarationStacks::FunctionStack> popScopeInternal(ScopeRef& scope, bool shouldTrackClosedVariables)
@@ -1628,7 +1639,7 @@ private:
     NEVER_INLINE void updateErrorMessage(const char* msg)
     {
         ASSERT(msg);
-        m_errorMessage = String(msg);
+        m_errorMessage = String::fromLatin1(msg);
         ASSERT(!m_errorMessage.isNull());
     }
 
@@ -1640,6 +1651,7 @@ private:
     void endLoop() { currentScope()->endLoop(); }
     void startSwitch() { currentScope()->startSwitch(); }
     void endSwitch() { currentScope()->endSwitch(); }
+    ImplementationVisibility implementationVisibility() { return currentScope()->implementationVisibility(); }
     LexicalScopeFeatures lexicalScopeFeatures() { return currentScope()->lexicalScopeFeatures(); }
     void setStrictMode() { currentScope()->setStrictMode(); }
     bool strictMode() { return currentScope()->strictMode(); }
@@ -2072,13 +2084,14 @@ private:
 
     ParserState m_parserState;
     
-    bool m_hasStackOverflow;
+    bool m_hasStackOverflow { false };
     String m_errorMessage;
     JSToken m_token;
-    bool m_allowsIn;
+    bool m_allowsIn { true };
     JSTextPosition m_lastTokenEndPosition;
-    int m_statementDepth;
+    int m_statementDepth { 0 };
     RefPtr<SourceProviderCache> m_functionCache;
+    ImplementationVisibility m_implementationVisibility;
     bool m_parsingBuiltin;
     SourceParseMode m_parseMode;
     JSParserScriptMode m_scriptMode;
@@ -2086,7 +2099,7 @@ private:
     ConstructorKind m_defaultConstructorKindForTopLevelFunction;
     ExpressionErrorClassifier* m_expressionErrorClassifier;
     bool m_isEvalContext;
-    bool m_immediateParentAllowsFunctionDeclarationInStatement;
+    bool m_immediateParentAllowsFunctionDeclarationInStatement { false };
     RefPtr<ModuleScopeData> m_moduleScopeData;
     DebuggerParseData* m_debuggerParseData;
     CallOrApplyDepthScope* m_callOrApplyDepthScope { nullptr };
@@ -2192,7 +2205,7 @@ std::unique_ptr<ParsedNode> Parser<LexerType>::parse(ParserError& error, const I
 template <class ParsedNode>
 std::unique_ptr<ParsedNode> parse(
     VM& vm, const SourceCode& source,
-    const Identifier& name, JSParserBuiltinMode builtinMode,
+    const Identifier& name, ImplementationVisibility implementationVisibility, JSParserBuiltinMode builtinMode,
     JSParserStrictMode strictMode, JSParserScriptMode scriptMode, SourceParseMode parseMode, SuperBinding superBinding,
     ParserError& error, JSTextPosition* positionBeforeLastNewline = nullptr,
     ConstructorKind defaultConstructorKindForTopLevelFunction = ConstructorKind::None,
@@ -2211,7 +2224,7 @@ std::unique_ptr<ParsedNode> parse(
 
     std::unique_ptr<ParsedNode> result;
     if (source.provider()->source().is8Bit()) {
-        Parser<Lexer<LChar>> parser(vm, source, builtinMode, strictMode, scriptMode, parseMode, superBinding, defaultConstructorKindForTopLevelFunction, derivedContextType, isEvalNode<ParsedNode>(), evalContextType, debuggerParseData, isInsideOrdinaryFunction);
+        Parser<Lexer<LChar>> parser(vm, source, implementationVisibility, builtinMode, strictMode, scriptMode, parseMode, superBinding, defaultConstructorKindForTopLevelFunction, derivedContextType, isEvalNode<ParsedNode>(), evalContextType, debuggerParseData, isInsideOrdinaryFunction);
         result = parser.parse<ParsedNode>(error, name, isEvalNode<ParsedNode>() ? ParsingContext::Eval : ParsingContext::Program, std::nullopt, parentScopePrivateNames, classFieldLocations);
         if (positionBeforeLastNewline)
             *positionBeforeLastNewline = parser.positionBeforeLastNewline();
@@ -2219,12 +2232,12 @@ std::unique_ptr<ParsedNode> parse(
             if (!result) {
                 ASSERT(error.isValid());
                 if (error.type() != ParserError::StackOverflow)
-                    dataLogLn("Unexpected error compiling builtin: ", error.message());
+                    dataLogLn("Unexpected error compiling builtin: ", error.message(), " on line ", error.line(), " for function ", name.impl(), ".");
             }
         }
     } else {
         ASSERT_WITH_MESSAGE(defaultConstructorKindForTopLevelFunction == ConstructorKind::None, "BuiltinExecutables's special constructors should always use a 8-bit string");
-        Parser<Lexer<UChar>> parser(vm, source, builtinMode, strictMode, scriptMode, parseMode, superBinding, defaultConstructorKindForTopLevelFunction, derivedContextType, isEvalNode<ParsedNode>(), evalContextType, debuggerParseData, isInsideOrdinaryFunction);
+        Parser<Lexer<UChar>> parser(vm, source, implementationVisibility, builtinMode, strictMode, scriptMode, parseMode, superBinding, defaultConstructorKindForTopLevelFunction, derivedContextType, isEvalNode<ParsedNode>(), evalContextType, debuggerParseData, isInsideOrdinaryFunction);
         result = parser.parse<ParsedNode>(error, name, isEvalNode<ParsedNode>() ? ParsingContext::Eval : ParsingContext::Program, std::nullopt, parentScopePrivateNames, classFieldLocations);
         if (positionBeforeLastNewline)
             *positionBeforeLastNewline = parser.positionBeforeLastNewline();
@@ -2254,12 +2267,12 @@ inline std::unique_ptr<ProgramNode> parseFunctionForFunctionConstructor(VM& vm, 
     bool isEvalNode = false;
     std::unique_ptr<ProgramNode> result;
     if (source.provider()->source().is8Bit()) {
-        Parser<Lexer<LChar>> parser(vm, source, JSParserBuiltinMode::NotBuiltin, JSParserStrictMode::NotStrict, JSParserScriptMode::Classic, SourceParseMode::ProgramMode, SuperBinding::NotNeeded, ConstructorKind::None, DerivedContextType::None, isEvalNode, EvalContextType::None, nullptr);
+        Parser<Lexer<LChar>> parser(vm, source, ImplementationVisibility::Public, JSParserBuiltinMode::NotBuiltin, JSParserStrictMode::NotStrict, JSParserScriptMode::Classic, SourceParseMode::ProgramMode, SuperBinding::NotNeeded, ConstructorKind::None, DerivedContextType::None, isEvalNode, EvalContextType::None, nullptr);
         result = parser.parse<ProgramNode>(error, name, ParsingContext::FunctionConstructor, functionConstructorParametersEndPosition);
         if (positionBeforeLastNewline)
             *positionBeforeLastNewline = parser.positionBeforeLastNewline();
     } else {
-        Parser<Lexer<UChar>> parser(vm, source, JSParserBuiltinMode::NotBuiltin, JSParserStrictMode::NotStrict, JSParserScriptMode::Classic, SourceParseMode::ProgramMode, SuperBinding::NotNeeded, ConstructorKind::None, DerivedContextType::None, isEvalNode, EvalContextType::None, nullptr);
+        Parser<Lexer<UChar>> parser(vm, source, ImplementationVisibility::Public, JSParserBuiltinMode::NotBuiltin, JSParserStrictMode::NotStrict, JSParserScriptMode::Classic, SourceParseMode::ProgramMode, SuperBinding::NotNeeded, ConstructorKind::None, DerivedContextType::None, isEvalNode, EvalContextType::None, nullptr);
         result = parser.parse<ProgramNode>(error, name, ParsingContext::FunctionConstructor, functionConstructorParametersEndPosition);
         if (positionBeforeLastNewline)
             *positionBeforeLastNewline = parser.positionBeforeLastNewline();

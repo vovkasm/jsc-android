@@ -40,11 +40,24 @@
 namespace JSC { namespace Wasm {
 
 struct PatchpointExceptionHandle {
+    PatchpointExceptionHandle(std::optional<bool> hasExceptionHandlers)
+        : m_hasExceptionHandlers(hasExceptionHandlers)
+    { }
+
+    PatchpointExceptionHandle(std::optional<bool> hasExceptionHandlers, unsigned callSiteIndex, unsigned numLiveValues)
+        : m_hasExceptionHandlers(hasExceptionHandlers)
+        , m_callSiteIndex(callSiteIndex)
+        , m_numLiveValues(numLiveValues)
+    { }
+
     template <typename Generator>
     void generate(CCallHelpers& jit, const B3::StackmapGenerationParams& params, Generator* generator) const
     {
-        if (m_callSiteIndex == s_invalidCallSiteIndex)
+        if (m_callSiteIndex == s_invalidCallSiteIndex) {
+            if (!m_hasExceptionHandlers || m_hasExceptionHandlers.value())
+                jit.store32(CCallHelpers::TrustedImm32(m_callSiteIndex), CCallHelpers::tagFor(CallFrameSlot::argumentCountIncludingThis));
             return;
+        }
 
         StackMap values(m_numLiveValues);
         unsigned paramsOffset = params.size() - m_numLiveValues;
@@ -58,6 +71,7 @@ struct PatchpointExceptionHandle {
 
     static constexpr unsigned s_invalidCallSiteIndex = std::numeric_limits<unsigned>::max();
 
+    std::optional<bool> m_hasExceptionHandlers;
     unsigned m_callSiteIndex { s_invalidCallSiteIndex };
     unsigned m_numLiveValues;
 };
@@ -102,7 +116,7 @@ static inline void emitRethrowImpl(CCallHelpers& jit)
     {
         auto preciseAllocationCase = jit.branchTestPtr(CCallHelpers::NonZero, scratch, CCallHelpers::TrustedImm32(PreciseAllocation::halfAlignment));
         jit.andPtr(CCallHelpers::TrustedImmPtr(MarkedBlock::blockMask), scratch);
-        jit.loadPtr(CCallHelpers::Address(scratch, MarkedBlock::offsetOfFooter + MarkedBlock::Footer::offsetOfVM()), scratch);
+        jit.loadPtr(CCallHelpers::Address(scratch, MarkedBlock::offsetOfHeader + MarkedBlock::Header::offsetOfVM()), scratch);
         auto loadedCase = jit.jump();
 
         preciseAllocationCase.link(&jit);
@@ -115,7 +129,7 @@ static inline void emitRethrowImpl(CCallHelpers& jit)
     CCallHelpers::Call call = jit.call(OperationPtrTag);
     jit.farJump(GPRInfo::returnValueGPR, ExceptionHandlerPtrTag);
     jit.addLinkTask([call] (LinkBuffer& linkBuffer) {
-        linkBuffer.link(call, FunctionPtr<OperationPtrTag>(operationWasmRethrow));
+        linkBuffer.link<OperationPtrTag>(call, operationWasmRethrow);
     });
 }
 
@@ -130,7 +144,7 @@ static inline void emitThrowImpl(CCallHelpers& jit, unsigned exceptionIndex)
     {
         auto preciseAllocationCase = jit.branchTestPtr(CCallHelpers::NonZero, scratch, CCallHelpers::TrustedImm32(PreciseAllocation::halfAlignment));
         jit.andPtr(CCallHelpers::TrustedImmPtr(MarkedBlock::blockMask), scratch);
-        jit.loadPtr(CCallHelpers::Address(scratch, MarkedBlock::offsetOfFooter + MarkedBlock::Footer::offsetOfVM()), scratch);
+        jit.loadPtr(CCallHelpers::Address(scratch, MarkedBlock::offsetOfHeader + MarkedBlock::Header::offsetOfVM()), scratch);
         auto loadedCase = jit.jump();
 
         preciseAllocationCase.link(&jit);
@@ -145,7 +159,7 @@ static inline void emitThrowImpl(CCallHelpers& jit, unsigned exceptionIndex)
     CCallHelpers::Call call = jit.call(OperationPtrTag);
     jit.farJump(GPRInfo::returnValueGPR, ExceptionHandlerPtrTag);
     jit.addLinkTask([call] (LinkBuffer& linkBuffer) {
-        linkBuffer.link(call, FunctionPtr<OperationPtrTag>(operationWasmThrow));
+        linkBuffer.link<OperationPtrTag>(call, operationWasmThrow);
     });
 }
 
@@ -170,7 +184,7 @@ static inline void emitCatchPrologueShared(B3::Air::Code& code, CCallHelpers& ji
         // https://bugs.webkit.org/show_bug.cgi?id=231213
         auto preciseAllocationCase = jit.branchTestPtr(CCallHelpers::NonZero, GPRInfo::regT0, CCallHelpers::TrustedImm32(PreciseAllocation::halfAlignment));
         jit.andPtr(CCallHelpers::TrustedImmPtr(MarkedBlock::blockMask), GPRInfo::regT0);
-        jit.loadPtr(CCallHelpers::Address(GPRInfo::regT0, MarkedBlock::offsetOfFooter + MarkedBlock::Footer::offsetOfVM()), GPRInfo::regT0);
+        jit.loadPtr(CCallHelpers::Address(GPRInfo::regT0, MarkedBlock::offsetOfHeader + MarkedBlock::Header::offsetOfVM()), GPRInfo::regT0);
         auto loadedCase = jit.jump();
 
         preciseAllocationCase.link(&jit);

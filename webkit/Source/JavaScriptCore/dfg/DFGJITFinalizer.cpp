@@ -36,7 +36,7 @@
 
 namespace JSC { namespace DFG {
 
-JITFinalizer::JITFinalizer(Plan& plan, Ref<JITCode>&& jitCode, std::unique_ptr<LinkBuffer> linkBuffer, MacroAssemblerCodePtr<JSEntryPtrTag> withArityCheck)
+JITFinalizer::JITFinalizer(Plan& plan, Ref<JITCode>&& jitCode, std::unique_ptr<LinkBuffer> linkBuffer, CodePtr<JSEntryPtrTag> withArityCheck)
     : Finalizer(plan)
     , m_jitCode(WTFMove(jitCode))
     , m_linkBuffer(WTFMove(linkBuffer))
@@ -44,9 +44,7 @@ JITFinalizer::JITFinalizer(Plan& plan, Ref<JITCode>&& jitCode, std::unique_ptr<L
 {
 }
 
-JITFinalizer::~JITFinalizer()
-{
-}
+JITFinalizer::~JITFinalizer() = default;
 
 size_t JITFinalizer::codeSize()
 {
@@ -64,6 +62,7 @@ bool JITFinalizer::finalize()
     CodeBlock* codeBlock = m_plan.codeBlock();
 
     codeBlock->setJITCode(m_jitCode.copyRef());
+    codeBlock->setDFGJITData(m_plan.finalizeJITData(m_jitCode.get()));
 
 #if ENABLE(FTL_JIT)
     m_jitCode->optimizeAfterWarmUp(codeBlock);

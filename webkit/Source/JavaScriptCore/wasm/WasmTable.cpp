@@ -48,7 +48,6 @@ void Table::setLength(uint32_t length)
 Table::Table(uint32_t initial, std::optional<uint32_t> maximum, TableElementType type)
     : m_type(type)
     , m_maximum(maximum)
-    , m_owner(nullptr)
 {
     setLength(initial);
     ASSERT(!m_maximum || *m_maximum >= m_length);
@@ -141,7 +140,7 @@ void Table::clear(uint32_t index)
     RELEASE_ASSERT(m_owner);
     if (auto* funcRefTable = asFuncrefTable()) {
         funcRefTable->m_importableFunctions.get()[index] = WasmToWasmImportableFunction();
-        ASSERT(funcRefTable->m_importableFunctions.get()[index].signatureIndex == Wasm::Signature::invalidIndex); // We rely on this in compiled code.
+        ASSERT(funcRefTable->m_importableFunctions.get()[index].typeIndex == Wasm::TypeDefinition::invalidIndex); // We rely on this in compiled code.
         funcRefTable->m_instances.get()[index] = nullptr;
     }
     m_jsValues.get()[index].setStartingValue(jsNull());
@@ -197,7 +196,7 @@ FuncRefTable::FuncRefTable(uint32_t initial, std::optional<uint32_t> maximum)
     m_instances = MallocPtr<Instance*, VMMalloc>::malloc(sizeof(Instance*) * Checked<size_t>(allocatedLength(m_length)));
     for (uint32_t i = 0; i < allocatedLength(m_length); ++i) {
         new (&m_importableFunctions.get()[i]) WasmToWasmImportableFunction();
-        ASSERT(m_importableFunctions.get()[i].signatureIndex == Wasm::Signature::invalidIndex); // We rely on this in compiled code.
+        ASSERT(m_importableFunctions.get()[i].typeIndex == Wasm::TypeDefinition::invalidIndex); // We rely on this in compiled code.
         m_instances.get()[i] = nullptr;
     }
 }

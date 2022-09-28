@@ -34,20 +34,36 @@ macro getOperandNarrow(opcodeStruct, fieldName, dst)
     loadbsi constexpr %opcodeStruct%_%fieldName%_index + OpcodeIDNarrowSize[PB, PC, 1], dst
 end
 
-macro getuOperandWide16(opcodeStruct, fieldName, dst)
-    loadh constexpr %opcodeStruct%_%fieldName%_index * 2 + OpcodeIDWide16Size[PB, PC, 1], dst
+macro getuOperandWide16JS(opcodeStruct, fieldName, dst)
+    loadh constexpr %opcodeStruct%_%fieldName%_index * 2 + OpcodeIDWide16SizeJS[PB, PC, 1], dst
 end
 
-macro getOperandWide16(opcodeStruct, fieldName, dst)
-    loadhsi constexpr %opcodeStruct%_%fieldName%_index * 2 + OpcodeIDWide16Size[PB, PC, 1], dst
+macro getuOperandWide16Wasm(opcodeStruct, fieldName, dst)
+    loadh constexpr %opcodeStruct%_%fieldName%_index * 2 + OpcodeIDWide16SizeWasm[PB, PC, 1], dst
 end
 
-macro getuOperandWide32(opcodeStruct, fieldName, dst)
-    loadi constexpr %opcodeStruct%_%fieldName%_index * 4 + OpcodeIDWide32Size[PB, PC, 1], dst
+macro getOperandWide16JS(opcodeStruct, fieldName, dst)
+    loadhsi constexpr %opcodeStruct%_%fieldName%_index * 2 + OpcodeIDWide16SizeJS[PB, PC, 1], dst
 end
 
-macro getOperandWide32(opcodeStruct, fieldName, dst)
-    loadis constexpr %opcodeStruct%_%fieldName%_index * 4 + OpcodeIDWide32Size[PB, PC, 1], dst
+macro getOperandWide16Wasm(opcodeStruct, fieldName, dst)
+    loadhsi constexpr %opcodeStruct%_%fieldName%_index * 2 + OpcodeIDWide16SizeWasm[PB, PC, 1], dst
+end
+
+macro getuOperandWide32JS(opcodeStruct, fieldName, dst)
+    loadi constexpr %opcodeStruct%_%fieldName%_index * 4 + OpcodeIDWide32SizeJS[PB, PC, 1], dst
+end
+
+macro getuOperandWide32Wasm(opcodeStruct, fieldName, dst)
+    loadi constexpr %opcodeStruct%_%fieldName%_index * 4 + OpcodeIDWide32SizeWasm[PB, PC, 1], dst
+end
+
+macro getOperandWide32JS(opcodeStruct, fieldName, dst)
+    loadis constexpr %opcodeStruct%_%fieldName%_index * 4 + OpcodeIDWide32SizeJS[PB, PC, 1], dst
+end
+
+macro getOperandWide32Wasm(opcodeStruct, fieldName, dst)
+    loadis constexpr %opcodeStruct%_%fieldName%_index * 4 + OpcodeIDWide32SizeWasm[PB, PC, 1], dst
 end
 
 macro makeReturn(get, dispatch, fn)
@@ -711,13 +727,35 @@ end
 # Entrypoints into the interpreter
 
 # Expects that CodeBlock is in t1, which is what prologue() leaves behind.
-macro functionArityCheck(opcodeName, doneLabel, slowPath)
+macro functionArityCheck(opcodeName, doneLabel)
     loadi PayloadOffset + ArgumentCountIncludingThis[cfr], t0
-    biaeq t0, CodeBlock::m_numParameters[t1], doneLabel
+    loadi CodeBlock::m_numParameters[t1], t2
+    biaeq t0, t2, doneLabel
+
+    # t0 argumentCountIncludingThis
+    # t1 CodeBlock
+    # t2 numParameters
+
+    addi CallFrameHeaderSlots, t2, t3
+    btiz t3, 0x1, .arityCheck
+    addi 1, t2
+.arityCheck:
+    subi t2, t0, t2
+    addi 1, t2, t3
+    andi ~1, t3
+    lshiftp 3, t3
+    subp cfr, t3, t5
+    loadp CodeBlock::m_vm[t1], t0
+    if C_LOOP or C_LOOP_WIN
+        bpbeq VM::m_cloopStackLimit[t0], t5, .stackHeightOK
+    else
+        bpbeq VM::m_softStackLimit[t0], t5, .stackHeightOK
+    end
+
     prepareStateForCCall()
     move cfr, a0
     move PC, a1
-    cCall2(slowPath)   # This slowPath has a simple protocol: t0 = 0 => no error, t0 != 0 => error
+    cCall2(_llint_slow_path_arityCheck)   # This slowPath has a simple protocol: t0 = 0 => no error, t0 != 0 => error
     btiz r0, .noError
 
     # We're throwing before the frame is fully set up. This frame will be
@@ -728,6 +766,8 @@ macro functionArityCheck(opcodeName, doneLabel, slowPath)
     move r1, cfr   # r1 contains caller frame
     jmp _llint_throw_from_slow_path_trampoline
 
+.stackHeightOK:
+    move t2, r1
 .noError:
     move r1, t1 # r1 contains slotsToAdd.
     btiz t1, .continue
@@ -2086,7 +2126,7 @@ macro compareOp(opcodeName, opcodeStruct, integerCompareAndSet, doubleCompareAnd
         return(BooleanTag, t1)
 
     .slow:
-        callSlowPath(_slow_path_%opcodeName%)
+        callSlowPath(_llint_slow_path_%opcodeName%)
         dispatch()
     end)
 end
@@ -2259,7 +2299,10 @@ macro callHelper(opcodeName, slowPath, opcodeStruct, valueProfileName, dstVirtua
 
 .notPolymorphic:
     bpneq t0, t3, .opCallSlow
-    prepareCall(t2, t3, t4, t1)
+    prepareCall(t2, t3, t4, t1, macro(address)
+        loadp %opcodeStruct%::Metadata::m_callLinkInfo.u.dataIC.m_codeBlock[t5], t2
+        storep t2, address
+    end)
 
 .goPolymorphic:
     loadp %opcodeStruct%::Metadata::m_callLinkInfo.u.dataIC.m_monomorphicCallDestination[t5], t5
@@ -2338,7 +2381,10 @@ macro doCallVarargs(opcodeName, size, get, opcodeStruct, valueProfileName, dstVi
 
         .notPolymorphic:
             bpneq t0, t3, .opCallSlow
-            prepareCall(t2, t3, t4, t1)
+            prepareCall(t2, t3, t4, t1, macro(address)
+                loadp %opcodeStruct%::Metadata::m_callLinkInfo.u.dataIC.m_codeBlock[t5], t2
+                storep t2, address
+            end)
 
         .goPolymorphic:
             loadp %opcodeStruct%::Metadata::m_callLinkInfo.u.dataIC.m_monomorphicCallDestination[t5], t5
@@ -3196,8 +3242,11 @@ end)
 
 
 op(fuzzer_return_early_from_loop_hint, macro ()
-    move UndefinedTag, r1
-    move 0, r0
+    loadp CodeBlock[cfr], t0
+    loadp CodeBlock::m_globalObject[t0], t0
+    loadp JSGlobalObject::m_globalThis[t0], t0
+    move t0, r0
+    move CellTag, r1
     doReturn()
 end)
 

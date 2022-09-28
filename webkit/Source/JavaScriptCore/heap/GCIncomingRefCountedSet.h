@@ -41,13 +41,13 @@ public:
     // Returns true if the native object is new to this set.
     bool addReference(JSCell*, T*);
     
-    void sweep(VM&);
+    void sweep(VM&, CollectionScope);
     
     size_t size() const { return m_bytes; };
     
 private:
     Vector<T*> m_vector;
-    size_t m_bytes;
+    size_t m_bytes { 0 };
 };
 
 } // namespace JSC

@@ -161,10 +161,10 @@ private:
     WriteBarrierStructureID m_boundFunctionStructureID;
     WriteBarrier<ExecutableBase> m_executable;
     std::unique_ptr<AllocationProfileClearingWatchpoint> m_allocationProfileClearingWatchpoint;
-    bool m_hasReifiedLength : 1;
-    bool m_hasReifiedName : 1;
-    bool m_hasModifiedLengthForNonHostFunction : 1;
-    bool m_hasModifiedNameForNonHostFunction : 1;
+    bool m_hasReifiedLength : 1 { false };
+    bool m_hasReifiedName : 1 { false };
+    bool m_hasModifiedLengthForNonHostFunction : 1 { false };
+    bool m_hasModifiedNameForNonHostFunction : 1 { false };
 };
 
 class FunctionRareData::AllocationProfileClearingWatchpoint final : public Watchpoint {
@@ -178,7 +178,7 @@ public:
 
 private:
     // Own destructor may not be called. Keep members trivially destructible.
-    JSC_WATCHPOINT_FIELD(PackedCellPtr<FunctionRareData>, m_rareData);
+    PackedCellPtr<FunctionRareData> m_rareData;
 };
 
 inline Watchpoint* FunctionRareData::createAllocationProfileClearingWatchpoint()

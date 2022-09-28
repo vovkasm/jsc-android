@@ -35,7 +35,7 @@
 #include "WasmCalleeRegistry.h"
 #include "WasmIRGeneratorHelpers.h"
 #include "WasmNameSection.h"
-#include "WasmSignatureInlines.h"
+#include "WasmTypeDefinitionInlines.h"
 #include <wtf/DataLog.h>
 #include <wtf/Locker.h>
 #include <wtf/StdLibExtras.h>
@@ -46,10 +46,11 @@ namespace WasmOMGPlanInternal {
 static constexpr bool verbose = false;
 }
 
-OMGPlan::OMGPlan(Context* context, Ref<Module>&& module, uint32_t functionIndex, MemoryMode mode, CompletionTask&& task)
-    : Base(context, const_cast<ModuleInformation&>(module->moduleInformation()), WTFMove(task))
+OMGPlan::OMGPlan(VM& vm, Ref<Module>&& module, uint32_t functionIndex, std::optional<bool> hasExceptionHandlers, MemoryMode mode, CompletionTask&& task)
+    : Base(vm, const_cast<ModuleInformation&>(module->moduleInformation()), WTFMove(task))
     , m_module(WTFMove(module))
     , m_calleeGroup(*m_module->calleeGroupFor(mode))
+    , m_hasExceptionHandlers(hasExceptionHandlers)
     , m_functionIndex(functionIndex)
 {
     ASSERT(Options::useOMGJIT());
@@ -68,12 +69,12 @@ void OMGPlan::work(CompilationEffort)
     const uint32_t functionIndexSpace = m_functionIndex + m_module->moduleInformation().importFunctionCount();
     ASSERT(functionIndexSpace < m_module->moduleInformation().functionIndexSpaceSize());
 
-    SignatureIndex signatureIndex = m_moduleInformation->internalFunctionSignatureIndices[m_functionIndex];
-    const Signature& signature = SignatureInformation::get(signatureIndex);
+    TypeIndex typeIndex = m_moduleInformation->internalFunctionTypeIndices[m_functionIndex];
+    const TypeDefinition& signature = TypeInformation::get(typeIndex);
 
     Vector<UnlinkedWasmToWasmCall> unlinkedCalls;
     CompilationContext context;
-    auto parseAndCompileResult = parseAndCompileB3(context, function, signature, unlinkedCalls, m_moduleInformation.get(), m_mode, CompilationMode::OMGMode, m_functionIndex, UINT32_MAX);
+    auto parseAndCompileResult = parseAndCompileB3(context, function, signature, unlinkedCalls, m_moduleInformation.get(), m_mode, CompilationMode::OMGMode, m_functionIndex, m_hasExceptionHandlers, UINT32_MAX);
 
     if (UNLIKELY(!parseAndCompileResult)) {
         Locker locker { m_lock };
@@ -101,7 +102,7 @@ void OMGPlan::work(CompilationEffort)
 
     omgEntrypoint.calleeSaveRegisters = WTFMove(internalFunction->entrypoint.calleeSaveRegisters);
 
-    MacroAssemblerCodePtr<WasmEntryPtrTag> entrypoint;
+    CodePtr<WasmEntryPtrTag> entrypoint;
     {
         ASSERT(m_calleeGroup.ptr() == m_module->calleeGroupFor(mode()));
         Ref<OMGCallee> callee = OMGCallee::create(WTFMove(omgEntrypoint), functionIndexSpace, m_moduleInformation->nameSection->get(functionIndexSpace), WTFMove(unlinkedCalls), WTFMove(internalFunction->stackmaps), WTFMove(internalFunction->exceptionHandlers), WTFMove(exceptionHandlerLocations));
@@ -121,7 +122,7 @@ void OMGPlan::work(CompilationEffort)
         m_calleeGroup->setOMGCallee(locker, m_functionIndex, callee.copyRef());
 
         for (auto& call : callee->wasmToWasmCallsites()) {
-            MacroAssemblerCodePtr<WasmEntryPtrTag> entrypoint;
+            CodePtr<WasmEntryPtrTag> entrypoint;
             if (call.functionIndexSpace < m_module->moduleInformation().importFunctionCount())
                 entrypoint = m_calleeGroup->m_wasmToWasmExitStubs[call.functionIndexSpace].code();
             else

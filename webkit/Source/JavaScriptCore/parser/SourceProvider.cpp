@@ -38,9 +38,7 @@ SourceProvider::SourceProvider(const SourceOrigin& sourceOrigin, String&& source
 {
 }
 
-SourceProvider::~SourceProvider()
-{
-}
+SourceProvider::~SourceProvider() = default;
 
 void SourceProvider::getID()
 {
@@ -50,6 +48,13 @@ void SourceProvider::getID()
         RELEASE_ASSERT(m_id);
     }
 }
+
+#if ENABLE(WEBASSEMBLY)
+BaseWebAssemblySourceProvider::BaseWebAssemblySourceProvider(const SourceOrigin& sourceOrigin, String&& sourceURL)
+    : SourceProvider(sourceOrigin, WTFMove(sourceURL), TextPosition(), SourceProviderSourceType::WebAssembly)
+{
+}
+#endif
 
 } // namespace JSC
 

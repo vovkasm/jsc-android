@@ -47,7 +47,7 @@ template<
     typename EnumType,
     typename std::underlying_type<EnumType>::type constant = std::numeric_limits<typename std::underlying_type<EnumType>::type>::max()>
 struct EnumMarkableTraits {
-    static_assert(std::is_enum<EnumType>::value, "");
+    static_assert(std::is_enum<EnumType>::value);
     using UnderlyingType = typename std::underlying_type<EnumType>::type;
 
     constexpr static bool isEmptyValue(EnumType value)
@@ -63,7 +63,7 @@ struct EnumMarkableTraits {
 
 template<typename IntegralType, IntegralType constant = 0>
 struct IntegralMarkableTraits {
-    static_assert(std::is_integral<IntegralType>::value, "");
+    static_assert(std::is_integral<IntegralType>::value);
     constexpr static bool isEmptyValue(IntegralType value)
     {
         return value == constant;
@@ -85,12 +85,9 @@ template<typename T, typename Traits>
 class Markable {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    constexpr Markable()
-        : m_value(Traits::emptyValue())
-    { }
+    constexpr Markable() = default;
 
     constexpr Markable(std::nullopt_t)
-        : Markable()
     { }
 
     constexpr Markable(T&& value)
@@ -147,8 +144,11 @@ public:
         return std::optional<T>(*this);
     }
 
+    template<typename Encoder> void encode(Encoder&) const;
+    template<typename Decoder> static std::optional<Markable> decode(Decoder&);
+
 private:
-    T m_value;
+    T m_value { Traits::emptyValue() };
 };
 
 template <typename T, typename Traits> constexpr bool operator==(const Markable<T, Traits>& x, const Markable<T, Traits>& y)
@@ -165,6 +165,36 @@ template <typename T, typename Traits> constexpr bool operator==(const T& v, con
 template <typename T, typename Traits> constexpr bool operator!=(const Markable<T, Traits>& x, const Markable<T, Traits>& y) { return !(x == y); }
 template <typename T, typename Traits> constexpr bool operator!=(const Markable<T, Traits>& x, const T& v) { return !(x == v); }
 template <typename T, typename Traits> constexpr bool operator!=(const T& v, const Markable<T, Traits>& x) { return !(v == x); }
+
+template <typename T, typename Traits>
+template<typename Encoder>
+void Markable<T, Traits>::encode(Encoder& encoder) const
+{
+    bool isEmpty = Traits::isEmptyValue(m_value);
+    encoder << isEmpty;
+    if (!isEmpty)
+        encoder << m_value;
+}
+
+template <typename T, typename Traits>
+template<typename Decoder>
+std::optional<Markable<T, Traits>> Markable<T, Traits>::decode(Decoder& decoder)
+{
+    std::optional<bool> isEmpty;
+    decoder >> isEmpty;
+    if (!isEmpty)
+        return std::nullopt;
+
+    if (*isEmpty)
+        return Markable { };
+
+    std::optional<T> value;
+    decoder >> value;
+    if (!value)
+        return std::nullopt;
+
+    return Markable { WTFMove(*value) };
+}
 
 } // namespace WTF
 

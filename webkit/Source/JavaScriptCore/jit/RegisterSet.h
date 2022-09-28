@@ -30,7 +30,6 @@
 #include "GPRInfo.h"
 #include "MacroAssembler.h"
 #include "Reg.h"
-#include "TempRegisterSet.h"
 #include <wtf/Bitmap.h>
 
 namespace JSC {
@@ -40,7 +39,7 @@ class RegisterAtOffsetList;
 
 class RegisterSet {
 public:
-    constexpr RegisterSet() { }
+    constexpr RegisterSet() = default;
 
     template<typename... Regs>
     constexpr explicit RegisterSet(Regs... regs)
@@ -61,7 +60,7 @@ public:
 #if ENABLE(WEBASSEMBLY)
     static RegisterSet webAssemblyCalleeSaveRegisters(); // Registers saved and used by the WebAssembly JIT.
 #endif
-    static RegisterSet volatileRegistersForJSCall();
+    JS_EXPORT_PRIVATE static RegisterSet volatileRegistersForJSCall();
     static RegisterSet stubUnavailableRegisters(); // The union of callee saves and special registers.
     JS_EXPORT_PRIVATE static RegisterSet macroScratchRegisters();
     JS_EXPORT_PRIVATE static RegisterSet allGPRs();
@@ -149,9 +148,7 @@ public:
     
     class iterator {
     public:
-        iterator()
-        {
-        }
+        iterator() = default;
         
         iterator(const RegisterBitmap::iterator& iter)
             : m_iter(iter)
@@ -202,6 +199,19 @@ private:
     RegisterBitmap m_bits;
 };
 
+struct RegisterSetHash {
+    static unsigned hash(const RegisterSet& set) { return set.hash(); }
+    static bool equal(const RegisterSet& a, const RegisterSet& b) { return a == b; }
+    static constexpr bool safeToCompareToEmptyOrDeleted = false;
+};
+
 } // namespace JSC
+
+namespace WTF {
+
+template<typename T> struct DefaultHash;
+template<> struct DefaultHash<JSC::RegisterSet> : JSC::RegisterSetHash { };
+
+} // namespace WTF
 
 #endif // !ENABLE(C_LOOP)

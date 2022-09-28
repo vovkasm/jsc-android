@@ -70,7 +70,7 @@ public:
     void addDescription(const CompiledBytecode&);
     void addDescription(const OriginStack&, const CString& description);
     ExecutionCounter* executionCounterFor(const OriginStack&);
-    void addOSRExitSite(const Vector<MacroAssemblerCodePtr<JSInternalPtrTag>>& codeAddresses);
+    void addOSRExitSite(const Vector<CodePtr<JSInternalPtrTag>>& codeAddresses);
     OSRExit* addOSRExit(unsigned id, const OriginStack&, ExitKind, bool isWatchpoint);
     
     void setJettisonReason(JettisonReason, const FireDetail*);
@@ -88,10 +88,10 @@ private:
     HashMap<OriginStack, std::unique_ptr<ExecutionCounter>> m_counters;
     Vector<OSRExitSite> m_osrExitSites;
     SegmentedVector<OSRExit> m_osrExits;
-    unsigned m_numInlinedGetByIds;
-    unsigned m_numInlinedPutByIds;
-    unsigned m_numInlinedCalls;
-    JettisonReason m_jettisonReason;
+    unsigned m_numInlinedGetByIds { 0 };
+    unsigned m_numInlinedPutByIds { 0 };
+    unsigned m_numInlinedCalls { 0 };
+    JettisonReason m_jettisonReason { NotJettisoned };
     CString m_additionalJettisonReason;
     UID m_uid;
 };

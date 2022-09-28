@@ -40,8 +40,6 @@ static constexpr bool verbose = false;
 }
 
 CallLinkStatus::CallLinkStatus(JSValue value)
-    : m_couldTakeSlowPath(false)
-    , m_isProved(false)
 {
     if (!value || !value.isCell()) {
         m_couldTakeSlowPath = true;
@@ -414,11 +412,11 @@ void CallLinkStatus::merge(const CallLinkStatus& other)
     }
 }
 
-void CallLinkStatus::filter(VM& vm, JSValue value)
+void CallLinkStatus::filter(JSValue value)
 {
     m_variants.removeAllMatching(
         [&] (CallVariant& variant) -> bool {
-            variant.filter(vm, value);
+            variant.filter(value);
             return !variant;
         });
 }

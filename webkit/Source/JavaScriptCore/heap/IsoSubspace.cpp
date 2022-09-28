@@ -51,9 +51,7 @@ IsoSubspace::IsoSubspace(CString name, Heap& heap, const HeapCellType& heapCellT
     m_firstDirectory = &m_directory;
 }
 
-IsoSubspace::~IsoSubspace()
-{
-}
+IsoSubspace::~IsoSubspace() = default;
 
 void IsoSubspace::didResizeBits(unsigned blockIndex)
 {
@@ -93,7 +91,7 @@ void* IsoSubspace::tryAllocateFromLowerTier()
     };
 
     if (!m_lowerTierFreeList.isEmpty()) {
-        PreciseAllocation* allocation = m_lowerTierFreeList.begin();
+        PreciseAllocation* allocation = &*m_lowerTierFreeList.begin();
         allocation->remove();
         return revive(allocation);
     }

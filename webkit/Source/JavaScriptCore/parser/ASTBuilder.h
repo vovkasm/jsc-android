@@ -37,7 +37,7 @@ namespace JSC {
 
 class ASTBuilder {
     struct BinaryOpInfo {
-        BinaryOpInfo() {}
+        BinaryOpInfo() = default;
         BinaryOpInfo(const JSTextPosition& otherStart, const JSTextPosition& otherDivot, const JSTextPosition& otherEnd, bool rhsHasAssignment)
             : start(otherStart)
             , divot(otherDivot)
@@ -60,7 +60,7 @@ class ASTBuilder {
     
     
     struct AssignmentInfo {
-        AssignmentInfo() {}
+        AssignmentInfo() = default;
         AssignmentInfo(ExpressionNode* node, const JSTextPosition& start, const JSTextPosition& divot, int initAssignments, Operator op)
             : m_node(node)
             , m_start(start)
@@ -82,7 +82,6 @@ public:
         : m_vm(vm)
         , m_parserArena(parserArena)
         , m_sourceCode(sourceCode)
-        , m_evalCount(0)
     {
     }
     
@@ -463,14 +462,14 @@ public:
     FunctionMetadataNode* createFunctionMetadata(
         const JSTokenLocation& startLocation, const JSTokenLocation& endLocation, 
         unsigned startColumn, unsigned endColumn, int functionKeywordStart, 
-        int functionNameStart, int parametersStart, LexicalScopeFeatures lexicalScopeFeatures, 
+        int functionNameStart, int parametersStart, ImplementationVisibility implementationVisibility, LexicalScopeFeatures lexicalScopeFeatures,
         ConstructorKind constructorKind, SuperBinding superBinding,
         unsigned parameterCount,
         SourceParseMode mode, bool isArrowFunctionBodyExpression)
     {
         return new (m_parserArena) FunctionMetadataNode(
             m_parserArena, startLocation, endLocation, startColumn, endColumn, 
-            functionKeywordStart, functionNameStart, parametersStart, 
+            functionKeywordStart, functionNameStart, parametersStart, implementationVisibility,
             lexicalScopeFeatures, constructorKind, superBinding,
             parameterCount, mode, isArrowFunctionBodyExpression);
     }
@@ -635,6 +634,8 @@ public:
         ForOfNode* result = new (m_parserArena) ForOfNode(isForAwait, location, lhs, iter, statements, WTFMove(lexicalVariables));
         result->setLoc(start, end, location.startOffset, location.lineStartOffset);
         setExceptionLocation(result, eStart, eDivot, eEnd);
+        if (isForAwait)
+            usesAwait();
         return result;
     }
     
@@ -1089,13 +1090,10 @@ public:
     
 private:
     struct Scope {
-        Scope()
-            : m_features(0)
-            , m_numConstants(0)
-        {
-        }
-        int m_features;
-        int m_numConstants;
+        Scope() = default;
+
+        int m_features { 0 };
+        int m_numConstants { 0 };
     };
 
     static void setExceptionLocation(ThrowableExpressionData* node, const JSTextPosition& divotStart, const JSTextPosition& divot, const JSTextPosition& divotEnd)
@@ -1181,7 +1179,7 @@ private:
     Vector<AssignmentInfo, 10, UnsafeVectorOverflow> m_assignmentInfoStack;
     Vector<std::pair<int, int>, 10, UnsafeVectorOverflow> m_binaryOperatorStack;
     Vector<std::pair<int, JSTextPosition>, 10, UnsafeVectorOverflow> m_unaryTokenStack;
-    int m_evalCount;
+    int m_evalCount { 0 };
 };
 
 ExpressionNode* ASTBuilder::makeTypeOfNode(const JSTokenLocation& location, ExpressionNode* expr)

@@ -123,11 +123,7 @@ ScopeNode::ScopeNode(ParserArena& parserArena, const JSTokenLocation& startLocat
     , m_startLineNumber(startLocation.line)
     , m_startStartOffset(startLocation.startOffset)
     , m_startLineStartOffset(startLocation.lineStartOffset)
-    , m_features(NoFeatures)
     , m_lexicalScopeFeatures(lexicalScopeFeatures)
-    , m_innerArrowFunctionCodeFeatures(NoInnerArrowFunctionFeatures)
-    , m_numConstants(0)
-    , m_statements(nullptr)
 {
 }
 
@@ -197,9 +193,10 @@ EvalNode::EvalNode(ParserArena& parserArena, const JSTokenLocation& startLocatio
 FunctionMetadataNode::FunctionMetadataNode(
     ParserArena&, const JSTokenLocation& startLocation, 
     const JSTokenLocation& endLocation, unsigned startColumn, unsigned endColumn, 
-    int functionKeywordStart, int functionNameStart, int parametersStart, LexicalScopeFeatures lexicalScopeFeatures,
+    int functionKeywordStart, int functionNameStart, int parametersStart, ImplementationVisibility implementationVisibility, LexicalScopeFeatures lexicalScopeFeatures,
     ConstructorKind constructorKind, SuperBinding superBinding, unsigned parameterCount, SourceParseMode mode, bool isArrowFunctionBodyExpression)
         : Node(endLocation)
+        , m_implementationVisibility(static_cast<unsigned>(implementationVisibility))
         , m_lexicalScopeFeatures(lexicalScopeFeatures)
         , m_superBinding(static_cast<unsigned>(superBinding))
         , m_constructorKind(static_cast<unsigned>(constructorKind))
@@ -215,6 +212,7 @@ FunctionMetadataNode::FunctionMetadataNode(
         , m_startStartOffset(startLocation.startOffset)
         , m_parameterCount(parameterCount)
 {
+    ASSERT(m_implementationVisibility == static_cast<unsigned>(implementationVisibility));
     ASSERT(m_superBinding == static_cast<unsigned>(superBinding));
     ASSERT(m_constructorKind == static_cast<unsigned>(constructorKind));
 }
@@ -222,9 +220,10 @@ FunctionMetadataNode::FunctionMetadataNode(
 FunctionMetadataNode::FunctionMetadataNode(
     const JSTokenLocation& startLocation, 
     const JSTokenLocation& endLocation, unsigned startColumn, unsigned endColumn, 
-    int functionKeywordStart, int functionNameStart, int parametersStart, LexicalScopeFeatures lexicalScopeFeatures, 
+    int functionKeywordStart, int functionNameStart, int parametersStart, ImplementationVisibility implementationVisibility, LexicalScopeFeatures lexicalScopeFeatures,
     ConstructorKind constructorKind, SuperBinding superBinding, unsigned parameterCount, SourceParseMode mode, bool isArrowFunctionBodyExpression)
         : Node(endLocation)
+        , m_implementationVisibility(static_cast<unsigned>(implementationVisibility))
         , m_lexicalScopeFeatures(lexicalScopeFeatures)
         , m_superBinding(static_cast<unsigned>(superBinding))
         , m_constructorKind(static_cast<unsigned>(constructorKind))
@@ -240,6 +239,7 @@ FunctionMetadataNode::FunctionMetadataNode(
         , m_startStartOffset(startLocation.startOffset)
         , m_parameterCount(parameterCount)
 {
+    ASSERT(m_implementationVisibility == static_cast<unsigned>(implementationVisibility));
     ASSERT(m_superBinding == static_cast<unsigned>(superBinding));
     ASSERT(m_constructorKind == static_cast<unsigned>(constructorKind));
 }
@@ -260,6 +260,7 @@ void FunctionMetadataNode::setEndPosition(JSTextPosition position)
 bool FunctionMetadataNode::operator==(const FunctionMetadataNode& other) const
 {
     return m_parseMode == other.m_parseMode
+        && m_implementationVisibility == other.m_implementationVisibility
         && m_lexicalScopeFeatures == other.m_lexicalScopeFeatures
         && m_superBinding == other.m_superBinding
         && m_constructorKind == other.m_constructorKind
@@ -283,6 +284,7 @@ bool FunctionMetadataNode::operator==(const FunctionMetadataNode& other) const
 void FunctionMetadataNode::dump(PrintStream& stream) const
 {
     stream.println("m_parseMode ", static_cast<uint32_t>(m_parseMode));
+    stream.println("m_implementationVisibility ", m_implementationVisibility);
     stream.println("m_lexicalScopeFeatures ", m_lexicalScopeFeatures);
     stream.println("m_superBinding ", m_superBinding);
     stream.println("m_constructorKind ", m_constructorKind);

@@ -13,10 +13,15 @@
 cmake_minimum_required(VERSION 3.12)
 project(WebKit)
 
+# Remove this cmake_policy() after upgrading cmake_minimum_required() to 3.20.
+if (${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.20")
+    cmake_policy(SET CMP0116 OLD)
+endif ()
+
 # -----------------------------------------------------------------------------
 # Common configuration
 #------------------------------------------------------------------------------
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/Source/cmake")
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/Source/cmake")
 include(WebKitCommon)
 
 # -----------------------------------------------------------------------------

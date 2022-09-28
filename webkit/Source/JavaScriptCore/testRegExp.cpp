@@ -41,14 +41,10 @@ const int MaxLineLength = 100 * 1024;
 using namespace JSC;
 
 struct CommandLine {
-    CommandLine()
-        : interactive(false)
-        , verbose(false)
-    {
-    }
+    CommandLine() = default;
 
-    bool interactive;
-    bool verbose;
+    bool interactive { false };
+    bool verbose { false };
     Vector<String> arguments;
     Vector<String> files;
 };
@@ -80,15 +76,11 @@ long StopWatch::getElapsedMS()
 }
 
 struct RegExpTest {
-    RegExpTest()
-        : offset(0)
-        , result(0)
-    {
-    }
+    RegExpTest() = default;
 
     String subject;
-    int offset;
-    int result;
+    int offset { 0 };
+    int result { 0 };
     Vector<int, 32> expectVector;
 };
 
@@ -122,7 +114,7 @@ private:
 };
 STATIC_ASSERT_ISO_SUBSPACE_SHARABLE(GlobalObject, JSGlobalObject);
 
-const ClassInfo GlobalObject::s_info = { "global", &JSGlobalObject::s_info, nullptr, nullptr, CREATE_METHOD_TABLE(GlobalObject) };
+const ClassInfo GlobalObject::s_info = { "global"_s, &JSGlobalObject::s_info, nullptr, nullptr, CREATE_METHOD_TABLE(GlobalObject) };
 
 GlobalObject::GlobalObject(VM& vm, Structure* structure, const Vector<String>& arguments)
     : JSGlobalObject(vm, structure)
@@ -318,7 +310,7 @@ static RegExp* parseRegExpLine(VM& vm, char* line, int lineLength, const char** 
 
     ++i;
 
-    auto flags = Yarr::parseFlags(line + i);
+    auto flags = Yarr::parseFlags(StringView::fromLatin1(line + i));
     if (!flags) {
         *regexpError = Yarr::errorMessage(Yarr::ErrorCode::InvalidRegularExpressionFlags);
         return nullptr;
@@ -507,11 +499,11 @@ static void parseArguments(int argc, char** argv, CommandLine& options)
         if (!strcmp(arg, "-v") || !strcmp(arg, "--verbose"))
             options.verbose = true;
         else
-            options.files.append(argv[i]);
+            options.files.append(String::fromLatin1(argv[i]));
     }
 
     for (; i < argc; ++i)
-        options.arguments.append(argv[i]);
+        options.arguments.append(String::fromLatin1(argv[i]));
 }
 
 int realMain(int argc, char** argv)

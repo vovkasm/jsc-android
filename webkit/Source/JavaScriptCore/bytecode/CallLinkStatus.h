@@ -44,9 +44,7 @@ class CallLinkInfo;
 class CallLinkStatus final {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    CallLinkStatus()
-    {
-    }
+    CallLinkStatus() = default;
     
     static CallLinkStatus takesSlowPath()
     {
@@ -110,7 +108,7 @@ public:
     
     void merge(const CallLinkStatus&);
     
-    void filter(VM&, JSValue);
+    void filter(JSValue);
     
     void dump(PrintStream&) const;
     

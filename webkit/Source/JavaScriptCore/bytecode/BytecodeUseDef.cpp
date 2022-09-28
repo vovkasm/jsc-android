@@ -42,7 +42,7 @@ namespace JSC {
 #define USES USES_OR_DEFS
 #define DEFS USES_OR_DEFS
 
-void computeUsesForBytecodeIndexImpl(VirtualRegister scopeRegister, const Instruction* instruction, Checkpoint checkpoint, const ScopedLambda<void(VirtualRegister)>& functor)
+void computeUsesForBytecodeIndexImpl(const JSInstruction* instruction, Checkpoint checkpoint, const ScopedLambda<void(VirtualRegister)>& functor)
 {
     OpcodeID opcodeID = instruction->opcodeID();
 
@@ -58,8 +58,6 @@ void computeUsesForBytecodeIndexImpl(VirtualRegister scopeRegister, const Instru
         int lastArg = -static_cast<int>(op.m_argv) + CallFrame::thisArgumentOffset();
         for (int i = 0; i < static_cast<int>(op.m_argc); i++)
             functor(VirtualRegister { lastArg + i });
-        if (opcodeID == op_call_eval)
-            functor(scopeRegister);
         return;
     };
 
@@ -323,9 +321,13 @@ void computeUsesForBytecodeIndexImpl(VirtualRegister scopeRegister, const Instru
     case op_construct:
         handleOpCallLike(instruction->as<OpConstruct>());
         return;
-    case op_call_eval:
-        handleOpCallLike(instruction->as<OpCallEval>());
+    case op_call_direct_eval: {
+        auto bytecode = instruction->as<OpCallDirectEval>();
+        handleOpCallLike(bytecode);
+        functor(bytecode.m_thisValue);
+        functor(bytecode.m_scope);
         return;
+    }
     case op_call:
         handleOpCallLike(instruction->as<OpCall>());
         return;
@@ -339,7 +341,7 @@ void computeUsesForBytecodeIndexImpl(VirtualRegister scopeRegister, const Instru
     }
 }
 
-void computeDefsForBytecodeIndexImpl(unsigned numVars, const Instruction* instruction, Checkpoint checkpoint, const ScopedLambda<void(VirtualRegister)>& functor)
+void computeDefsForBytecodeIndexImpl(unsigned numVars, const JSInstruction* instruction, Checkpoint checkpoint, const ScopedLambda<void(VirtualRegister)>& functor)
 {
 
     auto defAt = [&] (Checkpoint target, VirtualRegister operand) {
@@ -469,7 +471,7 @@ void computeDefsForBytecodeIndexImpl(unsigned numVars, const Instruction* instru
     DEFS(OpGetFromScope, dst)
     DEFS(OpCall, dst)
     DEFS(OpTailCall, dst)
-    DEFS(OpCallEval, dst)
+    DEFS(OpCallDirectEval, dst)
     DEFS(OpConstruct, dst)
     DEFS(OpTryGetById, dst)
     DEFS(OpGetById, dst)

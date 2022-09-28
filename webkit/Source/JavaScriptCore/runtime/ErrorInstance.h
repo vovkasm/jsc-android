@@ -45,7 +45,7 @@ public:
     }
 
     enum SourceTextWhereErrorOccurred { FoundExactSource, FoundApproximateSource };
-    typedef String (*SourceAppender) (const String& originalMessage, const String& sourceText, RuntimeType, SourceTextWhereErrorOccurred);
+    typedef String (*SourceAppender) (const String& originalMessage, StringView sourceText, RuntimeType, SourceTextWhereErrorOccurred);
 
     DECLARE_EXPORT_INFO;
 
@@ -117,12 +117,12 @@ protected:
     String m_stackString;
     RuntimeType m_runtimeTypeForCause { TypeNothing };
     ErrorType m_errorType { ErrorType::Error };
-    bool m_stackOverflowError : 1;
-    bool m_outOfMemoryError : 1;
-    bool m_errorInfoMaterialized : 1;
-    bool m_nativeGetterTypeError : 1;
+    bool m_stackOverflowError : 1 { false };
+    bool m_outOfMemoryError : 1 { false };
+    bool m_errorInfoMaterialized : 1 { false };
+    bool m_nativeGetterTypeError : 1 { false };
 #if ENABLE(WEBASSEMBLY)
-    bool m_catchableFromWasm : 1;
+    bool m_catchableFromWasm : 1 { true };
 #endif
 };
 

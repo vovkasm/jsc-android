@@ -53,7 +53,6 @@ public:
     };
 
     LazyJSValue(FrozenValue* value = FrozenValue::emptySingleton())
-        : m_kind(KnownValue)
     {
         u.value = value;
     }
@@ -118,14 +117,14 @@ public:
     void dumpInContext(PrintStream&, DumpContext*) const;
     
 private:
-    const StringImpl* tryGetStringImpl(VM&) const;
+    const StringImpl* tryGetStringImpl() const;
     
     union {
         FrozenValue* value;
         UChar character;
         StringImpl* stringImpl;
     } u;
-    LazinessKind m_kind;
+    LazinessKind m_kind { KnownValue };
 };
 
 } } // namespace JSC::DFG

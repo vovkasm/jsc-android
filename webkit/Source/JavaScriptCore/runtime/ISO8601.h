@@ -56,7 +56,7 @@ public:
 
 #define JSC_DEFINE_ISO8601_DURATION_FIELD(name, capitalizedName) \
     double name##s() const { return m_data[static_cast<uint8_t>(TemporalUnit::capitalizedName)]; } \
-    void set##capitalizedName##s(double value) { m_data[static_cast<uint8_t>(TemporalUnit::capitalizedName)] = value; }
+    void set##capitalizedName##s(double value) { m_data[static_cast<uint8_t>(TemporalUnit::capitalizedName)] = !value ? 0 : value; }
     JSC_TEMPORAL_UNITS(JSC_DEFINE_ISO8601_DURATION_FIELD);
 #undef JSC_DEFINE_ISO8601_DURATION_FIELD
 
@@ -71,8 +71,10 @@ public:
     Duration operator-() const
     {
         Duration result(*this);
-        for (auto& value : result.m_data)
-            value = -value;
+        for (auto& value : result.m_data) {
+            if (value)
+                value = -value;
+        }
         return result;
     }
 
@@ -198,12 +200,7 @@ private:
 class PlainTime {
     WTF_MAKE_FAST_ALLOCATED(PlainTime);
 public:
-    constexpr PlainTime()
-        : m_millisecond(0)
-        , m_microsecond(0)
-        , m_nanosecond(0)
-    {
-    }
+    constexpr PlainTime() = default;
 
     constexpr PlainTime(unsigned hour, unsigned minute, unsigned second, unsigned millisecond, unsigned microsecond, unsigned nanosecond)
         : m_hour(hour)
@@ -228,14 +225,15 @@ public:
             && lhs.microsecond() == rhs.microsecond()
             && lhs.nanosecond() == rhs.nanosecond();
     }
+    friend bool operator!=(PlainTime lhs, PlainTime rhs) { return !(lhs == rhs); }
 
 private:
     uint8_t m_hour { 0 };
     uint8_t m_minute { 0 };
     uint8_t m_second { 0 };
-    uint32_t m_millisecond : 10;
-    uint32_t m_microsecond : 10;
-    uint32_t m_nanosecond : 10;
+    uint32_t m_millisecond : 10 { 0 };
+    uint32_t m_microsecond : 10 { 0 };
+    uint32_t m_nanosecond : 10 { 0 };
 };
 static_assert(sizeof(PlainTime) <= sizeof(uint64_t));
 
@@ -244,12 +242,7 @@ static_assert(sizeof(PlainTime) <= sizeof(uint64_t));
 class PlainDate {
     WTF_MAKE_FAST_ALLOCATED(PlainDate);
 public:
-    constexpr PlainDate()
-        : m_year(0)
-        , m_month(1)
-        , m_day(1)
-    {
-    }
+    constexpr PlainDate() = default;
 
     constexpr PlainDate(int32_t year, unsigned month, unsigned day)
         : m_year(year)
@@ -258,14 +251,22 @@ public:
     {
     }
 
+    friend bool operator==(PlainDate lhs, PlainDate rhs)
+    {
+        return lhs.year() == rhs.year()
+            && lhs.month() == rhs.month()
+            && lhs.day() == rhs.day();
+    }
+    friend bool operator!=(PlainDate lhs, PlainDate rhs) { return !(lhs == rhs); }
+
     int32_t year() const { return m_year; }
     uint8_t month() const { return m_month; }
     uint8_t day() const { return m_day; }
 
 private:
-    int32_t m_year : 21; // ECMAScript max / min date's year can be represented <= 20 bits.
-    int32_t m_month : 5;
-    int32_t m_day : 6;
+    int32_t m_year : 21 { 0 }; // ECMAScript max / min date's year can be represented <= 20 bits.
+    int32_t m_month : 5 { 1 }; // Starts with 1.
+    int32_t m_day : 6 { 1 }; // Starts with 1.
 };
 #if COMPILER(GCC_COMPATIBLE)
 static_assert(sizeof(PlainDate) == sizeof(int32_t));
@@ -296,16 +297,25 @@ std::optional<std::tuple<PlainTime, std::optional<TimeZoneRecord>>> parseTime(St
 std::optional<std::tuple<PlainTime, std::optional<TimeZoneRecord>, std::optional<CalendarRecord>>> parseCalendarTime(StringView);
 std::optional<std::tuple<PlainDate, std::optional<PlainTime>, std::optional<TimeZoneRecord>>> parseDateTime(StringView);
 std::optional<std::tuple<PlainDate, std::optional<PlainTime>, std::optional<TimeZoneRecord>, std::optional<CalendarRecord>>> parseCalendarDateTime(StringView);
+uint8_t dayOfWeek(PlainDate);
+uint16_t dayOfYear(PlainDate);
+uint8_t weeksInYear(int32_t year);
+uint8_t weekOfYear(PlainDate);
+uint8_t daysInMonth(int32_t year, uint8_t month);
+uint8_t daysInMonth(uint8_t month);
 String formatTimeZoneOffsetString(int64_t);
-String temporalTimeToString(PlainTime, std::tuple<Precision, unsigned> precision);
+String temporalTimeToString(PlainTime, std::tuple<Precision, unsigned>);
 String temporalDateToString(PlainDate);
-unsigned daysInMonth(int32_t year, unsigned month);
+String temporalDateTimeToString(PlainDate, PlainTime, std::tuple<Precision, unsigned>);
+String monthCode(uint32_t);
+uint8_t monthFromCode(StringView);
 
 bool isValidDuration(const Duration&);
 
 std::optional<ExactTime> parseInstant(StringView);
 
 bool isDateTimeWithinLimits(int32_t year, uint8_t month, uint8_t day, unsigned hour, unsigned minute, unsigned second, unsigned millisecond, unsigned microsecond, unsigned nanosecond);
+bool isYearWithinLimits(double year);
 
 } // namespace ISO8601
 } // namespace JSC

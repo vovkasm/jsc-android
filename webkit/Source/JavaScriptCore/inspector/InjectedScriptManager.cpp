@@ -31,9 +31,9 @@
 #include "config.h"
 #include "InjectedScriptManager.h"
 
+#include "BuiltinNames.h"
 #include "CatchScope.h"
 #include "InjectedScriptHost.h"
-#include "InjectedScriptSource.h"
 #include "JSLock.h"
 #include "JSObjectInlines.h"
 #include "SourceCode.h"
@@ -46,13 +46,10 @@ using namespace JSC;
 InjectedScriptManager::InjectedScriptManager(InspectorEnvironment& environment, Ref<InjectedScriptHost>&& injectedScriptHost)
     : m_environment(environment)
     , m_injectedScriptHost(WTFMove(injectedScriptHost))
-    , m_nextInjectedScriptId(1)
 {
 }
 
-InjectedScriptManager::~InjectedScriptManager()
-{
-}
+InjectedScriptManager::~InjectedScriptManager() = default;
 
 void InjectedScriptManager::connect()
 {
@@ -135,27 +132,20 @@ void InjectedScriptManager::clearExceptionValue()
         injectedScript.clearExceptionValue();
 }
 
-String InjectedScriptManager::injectedScriptSource()
-{
-    return StringImpl::createWithoutCopying(InjectedScriptSource_js, sizeof(InjectedScriptSource_js));
-}
-
-Expected<JSObject*, NakedPtr<Exception>> InjectedScriptManager::createInjectedScript(const String& source, JSGlobalObject* globalObject, int id)
+Expected<JSObject*, NakedPtr<Exception>> InjectedScriptManager::createInjectedScript(JSGlobalObject* globalObject, int id)
 {
     VM& vm = globalObject->vm();
     JSLockHolder lock(vm);
     auto scope = DECLARE_CATCH_SCOPE(vm);
 
-    SourceCode sourceCode = makeSource(source, { });
     JSValue globalThisValue = globalObject->globalThis();
 
-    NakedPtr<Exception> evaluationException;
-    InspectorEvaluateHandler evaluateHandler = m_environment.evaluateHandler();
-    JSValue functionValue = evaluateHandler(globalObject, sourceCode, globalThisValue, evaluationException);
-    if (evaluationException)
-        return makeUnexpected(evaluationException);
+    auto* functionValue = jsCast<JSFunction*>(globalObject->linkTimeConstant(LinkTimeConstant::createInspectorInjectedScript));
+    RETURN_IF_EXCEPTION(scope, makeUnexpected(scope.exception()));
+    if (!functionValue)
+        return nullptr;
 
-    auto callData = getCallData(vm, functionValue);
+    auto callData = JSC::getCallData(functionValue);
     if (callData.type == CallData::Type::None)
         return nullptr;
 
@@ -166,7 +156,7 @@ Expected<JSObject*, NakedPtr<Exception>> InjectedScriptManager::createInjectedSc
     ASSERT(!args.hasOverflowed());
 
     JSValue result = JSC::call(globalObject, functionValue, callData, globalThisValue, args);
-    scope.clearException();
+    RETURN_IF_EXCEPTION(scope, makeUnexpected(scope.exception()));
     return result.getObject();
 }
 
@@ -183,7 +173,7 @@ InjectedScript InjectedScriptManager::injectedScriptFor(JSGlobalObject* globalOb
         return InjectedScript();
 
     int id = injectedScriptIdFor(globalObject);
-    auto createResult = createInjectedScript(injectedScriptSource(), globalObject, id);
+    auto createResult = createInjectedScript(globalObject, id);
     if (!createResult) {
         auto& error = createResult.error();
         ASSERT(error);
@@ -197,12 +187,10 @@ InjectedScript InjectedScriptManager::injectedScriptFor(JSGlobalObject* globalOb
         if (stack.size() > 0)
             stack[0].computeLineAndColumn(line, column);
         WTFLogAlways("Error when creating injected script: %s (%d:%d)\n", error->value().toWTFString(globalObject).utf8().data(), line, column);
-        WTFLogAlways("%s\n", injectedScriptSource().utf8().data());
         RELEASE_ASSERT_NOT_REACHED();
     }
     if (!createResult.value()) {
         WTFLogAlways("Missing injected script object");
-        WTFLogAlways("%s\n", injectedScriptSource().utf8().data());
         RELEASE_ASSERT_NOT_REACHED();
     }
 

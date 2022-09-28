@@ -50,7 +50,7 @@ public:
     typedef T ValueType;
     typedef ValueType* PtrType;
 
-    GRefPtr() : m_ptr(0) { }
+    GRefPtr() = default;
 
     GRefPtr(T* ptr)
         : m_ptr(ptr)
@@ -99,7 +99,7 @@ public:
 
     T*& outPtr()
     {
-        ASSERT(!m_ptr);
+        clear();
         return m_ptr;
     }
 
@@ -130,7 +130,7 @@ private:
     // Adopting constructor.
     GRefPtr(T* ptr, GRefPtrAdoptType) : m_ptr(ptr) {}
 
-    T* m_ptr;
+    T* m_ptr { nullptr };
 };
 
 template <typename T> inline GRefPtr<T>& GRefPtr<T>::operator=(const GRefPtr<T>& o)
@@ -250,6 +250,8 @@ template <> WTF_EXPORT_PRIVATE GDateTime* refGPtr(GDateTime* ptr);
 template <> WTF_EXPORT_PRIVATE void derefGPtr(GDateTime* ptr);
 template <> WTF_EXPORT_PRIVATE GDBusNodeInfo* refGPtr(GDBusNodeInfo* ptr);
 template <> WTF_EXPORT_PRIVATE void derefGPtr(GDBusNodeInfo* ptr);
+template <> WTF_EXPORT_PRIVATE GArray* refGPtr(GArray*);
+template <> WTF_EXPORT_PRIVATE void derefGPtr(GArray*);
 
 #if HAVE(GURI)
 template <> WTF_EXPORT_PRIVATE GUri* refGPtr(GUri*);

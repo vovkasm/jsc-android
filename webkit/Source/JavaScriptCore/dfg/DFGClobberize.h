@@ -731,6 +731,7 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     case TailCallForwardVarargsInlinedCaller:
     case ConstructVarargs:
     case ConstructForwardVarargs:
+    case CallDirectEval:
     case ToPrimitive:
     case ToPropertyKey:
     case InByVal:
@@ -832,13 +833,6 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
         write(TypedArrayProperties);
         return;
     }
-
-    case CallEval:
-        ASSERT(!node->origin.semantic.inlineCallFrame());
-        read(AbstractHeap(Stack, graph.m_codeBlock->scopeRegister()));
-        read(AbstractHeap(Stack, virtualRegisterForArgumentIncludingThis(0)));
-        clobberTop();
-        return;
 
     case Throw:
     case ThrowStaticError:
@@ -1338,14 +1332,15 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
         return;
         
     case GetIndexedPropertyStorage:
-        if (node->arrayMode().type() == Array::String) {
-            def(PureValue(node, node->arrayMode().asWord()));
-            return;
-        }
+        ASSERT(node->arrayMode().type() != Array::String);
         read(MiscFields);
         def(HeapLocation(IndexedPropertyStorageLoc, MiscFields, node->child1()), LazyNode(node));
         return;
-        
+
+    case ResolveRope:
+        def(PureValue(node));
+        return;
+
     case GetTypedArrayByteOffset:
         read(MiscFields);
         def(HeapLocation(TypedArrayByteOffsetLoc, MiscFields, node->child1()), LazyNode(node));
@@ -1818,6 +1813,10 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
             write(RegExpState);
             write(RegExpObject_lastIndex);
             return;
+        } else if (node->child1().useKind() == StringUse
+            && node->child2().useKind() == StringUse
+            && node->child3().useKind() == StringUse) {
+            return;
         }
         clobberTop();
         return;
@@ -1974,6 +1973,10 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     case WeakSetAdd: {
         Edge& mapEdge = node->child1();
         Edge& keyEdge = node->child2();
+        if (keyEdge.useKind() != ObjectUse) {
+            read(World);
+            write(SideState);
+        }
         write(JSWeakSetFields);
         def(HeapLocation(WeakMapGetLoc, JSWeakSetFields, mapEdge, keyEdge), LazyNode(keyEdge.node()));
         return;
@@ -1983,6 +1986,10 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
         Edge& mapEdge = graph.varArgChild(node, 0);
         Edge& keyEdge = graph.varArgChild(node, 1);
         Edge& valueEdge = graph.varArgChild(node, 2);
+        if (keyEdge.useKind() != ObjectUse) {
+            read(World);
+            write(SideState);
+        }
         write(JSWeakMapFields);
         def(HeapLocation(WeakMapGetLoc, JSWeakMapFields, mapEdge, keyEdge), LazyNode(valueEdge.node()));
         return;
@@ -2038,17 +2045,14 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
 
 class NoOpClobberize {
 public:
-    NoOpClobberize() { }
+    NoOpClobberize() = default;
     template<typename... T>
     void operator()(T...) const { }
 };
 
 class CheckClobberize {
 public:
-    CheckClobberize()
-        : m_result(false)
-    {
-    }
+    CheckClobberize() = default;
     
     template<typename... T>
     void operator()(T...) const { m_result = true; }
@@ -2056,7 +2060,7 @@ public:
     bool result() const { return m_result; }
     
 private:
-    mutable bool m_result;
+    mutable bool m_result { false };
 };
 
 bool doesWrites(Graph&, Node*);
@@ -2065,7 +2069,6 @@ class AbstractHeapOverlaps {
 public:
     AbstractHeapOverlaps(AbstractHeap heap)
         : m_heap(heap)
-        , m_result(false)
     {
     }
     
@@ -2080,7 +2083,7 @@ public:
 
 private:
     AbstractHeap m_heap;
-    mutable bool m_result;
+    mutable bool m_result { false };
 };
 
 bool accessesOverlap(Graph&, Node*, AbstractHeap);
