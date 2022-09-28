@@ -22,6 +22,28 @@
                 "CMAKE_ANDROID_ARCH_ABI": "armeabi-v7a",
                 "CMAKE_ANDROID_STL_TYPE": "c++_shared"
             }
+        },
+        {
+            "name": "android-x86",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/x86",
+            "cacheVariables": {
+                "CMAKE_SYSTEM_NAME": "Android",
+                "CMAKE_SYSTEM_VERSION": "21",
+                "CMAKE_ANDROID_ARCH_ABI": "x86",
+                "CMAKE_ANDROID_STL_TYPE": "c++_shared"
+            }
+        },
+        {
+            "name": "android-x86_64",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/x86_64",
+            "cacheVariables": {
+                "CMAKE_SYSTEM_NAME": "Android",
+                "CMAKE_SYSTEM_VERSION": "21",
+                "CMAKE_ANDROID_ARCH_ABI": "x86_64",
+                "CMAKE_ANDROID_STL_TYPE": "c++_shared"
+            }
         }
     ]
 }
