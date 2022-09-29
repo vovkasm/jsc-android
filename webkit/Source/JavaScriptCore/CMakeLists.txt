@@ -1511,6 +1511,9 @@ if (NOT "${PORT}" STREQUAL "Mac")
         WEBKIT_POPULATE_LIBRARY_VERSION(JAVASCRIPTCORE)
         set_target_properties(JavaScriptCore PROPERTIES VERSION ${JAVASCRIPTCORE_VERSION} SOVERSION ${JAVASCRIPTCORE_VERSION_MAJOR})
         install(TARGETS JavaScriptCore DESTINATION "${LIB_INSTALL_DIR}")
+
+        set_target_properties(JavaScriptCore PROPERTIES OUTPUT_NAME jsc)
+        install(FILES ${JavaScriptCore_PUBLIC_FRAMEWORK_HEADERS} DESTINATION "include/JavaScriptCore")
     endif ()
 endif ()
 
