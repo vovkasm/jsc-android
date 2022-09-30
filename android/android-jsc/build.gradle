@@ -1,0 +1,39 @@
+plugins {
+    id 'com.android.library'
+    id 'maven-publish'
+}
+
+def rootDir = "${rootProject.projectDir}/.."
+def jniLibsDir = "${rootDir}/build/output/lib"
+
+android {
+    namespace = "org.webkit.androidjsc"
+    compileSdkVersion 28
+
+    defaultConfig {
+        minSdkVersion 21
+        targetSdkVersion 28
+        versionCode 1
+        versionName "1.0"
+
+        aarMetadata {
+            minCompileSdk 28
+        }
+    }
+
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ["${jniLibsDir}"]
+        }
+    }
+
+    packagingOptions {
+//        jniLibs.keepDebugSymbols += "**/libjsc.so"
+    }
+
+    publishing {
+        singleVariant('release')
+    }
+}
+
+dependencies {}
