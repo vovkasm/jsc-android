@@ -22,7 +22,7 @@
     "scripts": {
         "clean": "rm -rf dist; rm -rf build",
         "native": "./build-all.sh",
-        "dist": "cd android && ./gradlew publishDist"
+        "dist": "cd android-library && ./gradlew publishDist"
     },
     "devDependencies": {
     }
