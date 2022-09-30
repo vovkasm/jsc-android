@@ -4,6 +4,7 @@ plugins {
 }
 
 def rootDir = "${rootProject.projectDir}/.."
+def distDir = "${rootDir}/dist"
 def jniLibsDir = "${rootDir}/build/output/lib"
 
 android {
@@ -37,3 +38,22 @@ android {
 }
 
 dependencies {}
+
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.release
+                groupId = 'org.webkit.androidjsc'
+                artifactId = 'android-jsc'
+                version = 'r1'
+            }
+        }
+        repositories {
+            maven {
+                name = 'dist'
+                url = distDir
+            }
+        }
+    }
+}
