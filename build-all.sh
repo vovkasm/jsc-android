@@ -3,7 +3,7 @@
 for preset in android-arm64 android-arm android-x86 android-x86_64
 do
     echo "Configure ${preset}"
-    cmake --preset $preset -DCMAKE_ANDROID_NDK=$ANDROID_NDK_HOME
+    cmake --preset $preset
 done
 
 for arch in arm64-v8a armeabi-v7a x86 x86_64

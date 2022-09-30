@@ -6,10 +6,11 @@
             "hidden": true,
             "generator": "Ninja",
             "installDir": "${sourceDir}/build/output",
+            "toolchainFile": "$env{ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake",
             "cacheVariables": {
-                "CMAKE_SYSTEM_NAME": "Android",
-                "CMAKE_SYSTEM_VERSION": "21",
-                "CMAKE_ANDROID_STL_TYPE": "c++_static"
+                "ANDROID_PLATFORM": "android-21",
+                "ANDROID_STL": "c++_static",
+                "CMAKE_ANDROID_NDK_VERSION": "24"
             }
         },
         {
@@ -17,7 +18,7 @@
             "inherits": ["android-base"],
             "binaryDir": "${sourceDir}/build/arm64-v8a",
             "cacheVariables": {
-                "CMAKE_ANDROID_ARCH_ABI": "arm64-v8a"
+                "ANDROID_ABI": "arm64-v8a"
             }
         },
         {
@@ -25,7 +26,7 @@
             "inherits": ["android-base"],
             "binaryDir": "${sourceDir}/build/armeabi-v7a",
             "cacheVariables": {
-                "CMAKE_ANDROID_ARCH_ABI": "armeabi-v7a"
+                "ANDROID_ABI": "armeabi-v7a"
             }
         },
         {
@@ -33,7 +34,7 @@
             "inherits": ["android-base"],
             "binaryDir": "${sourceDir}/build/x86",
             "cacheVariables": {
-                "CMAKE_ANDROID_ARCH_ABI": "x86"
+                "ANDROID_ABI": "x86"
             }
         },
         {
@@ -41,7 +42,7 @@
             "inherits": ["android-base"],
             "binaryDir": "${sourceDir}/build/x86_64",
             "cacheVariables": {
-                "CMAKE_ANDROID_ARCH_ABI": "x86_64"
+                "ANDROID_ABI": "x86_64"
             }
         }
     ]
