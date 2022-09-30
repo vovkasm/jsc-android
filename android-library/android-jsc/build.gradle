@@ -53,7 +53,7 @@ afterEvaluate {
         publications {
             release(MavenPublication) {
                 from components.release
-                groupId = 'org.webkit.androidjsc'
+                groupId = 'org.webkit'
                 artifactId = 'android-jsc'
                 version = 'r1'
             }
