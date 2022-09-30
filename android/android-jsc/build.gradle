@@ -39,6 +39,15 @@ android {
 
 dependencies {}
 
+tasks.register('copyHeadersToDist', Copy) {
+    description = 'Copy include headers into dist dir'
+    from "${rootDir}/build/output/include/JavaScriptCore"
+    into "${distDir}/include"
+}
+tasks.register('publishDist') {
+    dependsOn = ['copyHeadersToDist', 'publishReleasePublicationToDistRepository']
+}
+
 afterEvaluate {
     publishing {
         publications {
