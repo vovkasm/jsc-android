@@ -9,7 +9,7 @@
             "cacheVariables": {
                 "CMAKE_SYSTEM_NAME": "Android",
                 "CMAKE_SYSTEM_VERSION": "21",
-                "CMAKE_ANDROID_STL_TYPE": "c++_shared"
+                "CMAKE_ANDROID_STL_TYPE": "c++_static"
             }
         },
         {
