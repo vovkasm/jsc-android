@@ -23,6 +23,7 @@ endif()
 
 add_subdirectory(icu/source)
 
+set(LIB_INSTALL_DIR "lib/${CMAKE_ANDROID_ARCH_ABI}")
 set(ENABLE_API_TESTS OFF)
 set(ENABLE_TOOLS OFF)
 set(DEVELOPER_MODE OFF)

@@ -5,7 +5,7 @@
             "name": "android-base",
             "hidden": true,
             "generator": "Ninja",
-            "installDir": "${sourceDir}/build/install",
+            "installDir": "${sourceDir}/build/output",
             "cacheVariables": {
                 "CMAKE_SYSTEM_NAME": "Android",
                 "CMAKE_SYSTEM_VERSION": "21",
