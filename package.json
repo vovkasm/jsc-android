@@ -1,10 +1,10 @@
 {
-    "name": "jsc-android",
-    "version": "1.0.0",
+    "name": "@vovkasm/jsc-android",
+    "version": "0.0.1",
     "description": "Pre-build version of JavaScriptCore to be used by React Native apps",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/react-native-community/jsc-android-buildscripts.git"
+        "url": "git+https://github.com/vovkasm/jsc-android.git"
     },
     "keywords": [
         "react-native",
@@ -13,9 +13,9 @@
     ],
     "license": "BSD-2-Clause",
     "bugs": {
-        "url": "https://github.com/react-native-community/jsc-android-buildscripts/issues"
+        "url": "https://github.com/vovkasm/jsc-android/issues"
     },
-    "homepage": "https://github.com/react-native-community/jsc-android-buildscripts#readme",
+    "homepage": "https://github.com/vovkasm/jsc-android#readme",
     "files": [
         "/dist"
     ],
