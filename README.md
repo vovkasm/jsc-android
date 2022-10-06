@@ -1,6 +1,6 @@
 ## Differences with jsc-android-buildscripts
 
-Current version is 0.0.1, it is unstable and work-in-progress
+Current version is 0.0.2, it is unstable and work-in-progress
 
 - ICU and Webkit sources forked and embedded in repo
   - ICU 71.1 official distr
@@ -9,6 +9,9 @@ Current version is 0.0.1, it is unstable and work-in-progress
 - DFG JIT enabled
 - It use static libc++ and expose only C API, it makes used NDK maximally independed from other components. So please use
   latest NDK, if possible (tested with NDK 25.1.8937393).
+- It prepare ICU data as archive file (instead of .so) and place it in assets/icudt71l.dat in uncompressed state. Then ICU
+  uses this data by mmap it to memory address space. Because icudt71l.dat in the application assets folder, developers can
+  generate their own reduced file (see https://unicode-org.github.io/icu/userguide/icu_data/buildtool.html).
 
 ## Install
 
