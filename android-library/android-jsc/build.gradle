@@ -9,16 +9,16 @@ def jniLibsDir = "${rootDir}/build/output/lib"
 
 android {
     namespace = "org.webkit.androidjsc"
-    compileSdkVersion 28
+    compileSdkVersion 31
 
     defaultConfig {
         minSdkVersion 21
-        targetSdkVersion 28
+        targetSdkVersion 31
         versionCode 1
         versionName "1.0"
 
         aarMetadata {
-            minCompileSdk 28
+            minCompileSdk 31
         }
     }
 
@@ -26,6 +26,10 @@ android {
         main {
             jniLibs.srcDirs = ["${jniLibsDir}"]
         }
+    }
+
+    androidResources {
+        noCompress 'dat' // Disable compression of icudatXXl.dat file
     }
 
     packagingOptions {
