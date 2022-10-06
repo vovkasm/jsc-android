@@ -47,6 +47,19 @@ android/app/build.gradle
     }
 ```
 
+android/app/src/main/java/.../MainApplication.java
+```
+import org.webkit.androidjsc.JscManager; // <--- add this line
+
+  public void onCreate() {
+    super.onCreate();
+    JscManager.init(this.getAssets()); // <--- add this line
+    // If you opted-in for the New Architecture, we enable the TurboModule system
+    ReactFeatureFlags.useTurboModules = BuildConfig.IS_NEW_ARCHITECTURE_ENABLED;
+    SoLoader.init(this, /* native exopackage */ false);
+  }
+```
+
 ## Building from source
 
 Define ANDROID_NDK_HOME env var.
