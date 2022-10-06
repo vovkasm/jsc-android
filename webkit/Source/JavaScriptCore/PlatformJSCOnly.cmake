@@ -16,3 +16,13 @@ if (USE_GLIB)
         ${GLIB_LIBRARIES}
     )
 endif ()
+
+if (ANDROID)
+    list(APPEND JavaScriptCore_SOURCES
+        API/android/jni.cpp
+    )
+    list(APPEND JavaScriptCore_LIBRARIES
+        android
+        log
+    )
+endif ()
