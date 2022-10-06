@@ -4,4 +4,6 @@ __pycache__/
 
 .gradle/
 .cache/
+.idea/
+local.properties
 /compile_commands.json
